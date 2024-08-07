@@ -20,40 +20,40 @@ data Teacher
   | EquivalenceIO -- Teacher with automatic membership but manual equivalence
   deriving (Show, Read)
 
-data Aut = Fifo Int | Stack Int | Running Int | NFA1 | Bollig Int | NonResidual | Residual1 | Residual2
+data Aut = Running Int | Adversarial | NFA1 | Bollig Int | NonResidual
   deriving (Show, Read)
 
 -- existential wrapper
-data A = forall q i . (Nominal i, Contextual i, Show i, Read i, Nominal q, Show q) => A (Automaton q i)
+data A = forall q . (Nominal q, Show q) => A (Automaton q Atom)
 
 {- HLINT ignore "Redundant $" -}
 mainExample :: String -> String -> String -> IO ()
 mainExample learnerName teacherName autName = do
     A automaton <- return $ case read autName of
-            Fifo n      -> A $ Examples.fifoExample n
-            Stack n     -> A $ Examples.stackExample n
             Running n   -> A $ Examples.runningExample atoms n
+            Adversarial -> A $ Examples.adversarial
             NFA1        -> A $ Examples.exampleNFA1
             Bollig n    -> A $ Examples.exampleNFA2 n
             NonResidual -> A $ Examples.exampleNonResidual
-            Residual1   -> A $ Examples.exampleResidual1
-            Residual2   -> A $ Examples.exampleResidual2
     let teacher = case read teacherName of
             EqDFA         -> teacherWithTarget automaton
             EqNFA k       -> teacherWithTargetNonDet k automaton
             EquivalenceIO -> teacherWithTargetAndIO automaton
-    case read learnerName of
-            NomLStar    -> print $ learnAngluinRows teacher
-            NomLStarCol -> print $ learnAngluin teacher
-            NomNLStar   -> print $ learnBollig 0 0 teacher
+    let model = case read learnerName of
+            NomLStar    -> learnAngluinRows teacher
+            NomLStarCol -> learnAngluin teacher
+            NomNLStar   -> learnBollig 0 0 teacher
+    print model
+    putStrLn $ "Test: [1, 1] -> " ++ show (accepts automaton [a,a], accepts model [a,a])
 
 mainWithIO :: String -> IO ()
 mainWithIO learnerName = do
     let t = teacherWithIO atoms
-    case read learnerName of
-            NomLStar    -> print $ learnAngluinRows t
-            NomLStarCol -> print $ learnAngluin t
-            NomNLStar   -> print $ learnBollig 0 0 t
+    let model = case read learnerName of
+            NomLStar    -> learnAngluinRows t
+            NomLStarCol -> learnAngluin t
+            NomNLStar   -> learnBollig 0 0 t
+    print model
 
 main :: IO ()
 main = do
@@ -77,4 +77,4 @@ help = do
   where
     learners = [NomLStar, NomLStarCol, NomNLStar]
     teachers = [EqDFA, EqNFA 3, EquivalenceIO]
-    automata = [Fifo 3, Stack 3, Running 3, NFA1, Bollig 3, NonResidual, Residual1, Residual2]
+    automata = [Running 3, NFA1, Bollig 3, NonResidual]

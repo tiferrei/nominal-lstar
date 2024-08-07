@@ -6,6 +6,7 @@ module Examples
     , module Examples.NonResidual
     , module Examples.Residual
     , module Examples.RunningExample
+    , module Examples.Adversarial
     , module Examples.Stack
     ) where
 
@@ -15,6 +16,7 @@ import Examples.Fifo
 import Examples.NonResidual
 import Examples.Residual
 import Examples.RunningExample
+import Examples.Adversarial
 import Examples.Stack
 import NLambda (Atom)
 import Teacher (Teacher, teacherWithTarget)

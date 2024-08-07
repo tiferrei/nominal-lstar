@@ -41,7 +41,7 @@ mqToBool teacher qs = answer
 
 -- 1. This is a fully automatic teacher, which has an internal automaton
 -- Only works for DFAs for now, as those can be checked for equivalence
-teacherWithTarget :: (Nominal i, Nominal q) => Automaton q i -> Teacher i
+teacherWithTarget :: (Show i, Show q, Nominal i, Nominal q) => Automaton q i -> Teacher i
 teacherWithTarget aut = Teacher
     { membership = foreachQuery $ accepts aut
     , equivalent = automaticEquivalent bisim aut
@@ -80,7 +80,7 @@ teacherWithIO2 alph = Teacher
 -- 3. A teacher uses a target for the mebership queries, but you for equivalence
 -- Useful as long as you don't have an equivalence check
 -- used for NFAs when there was no bounded bisimulation yet
-teacherWithTargetAndIO :: (Show i, Read i, Nominal i, Contextual i, Nominal q) => Automaton q i -> Teacher i
+teacherWithTargetAndIO :: (Show i, Show q, Read i, Nominal i, Contextual i, Nominal q) => Automaton q i -> Teacher i
 teacherWithTargetAndIO aut = Teacher
     { membership = foreachQuery $ accepts aut
     , equivalent = ioEquivalent

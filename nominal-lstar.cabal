@@ -29,6 +29,7 @@ library
     Examples.NonResidual,
     Examples.Residual,
     Examples.RunningExample,
+    Examples.Adversarial,
     Examples.Stack,
     ObservationTableClass,
     SimpleObservationTable,
