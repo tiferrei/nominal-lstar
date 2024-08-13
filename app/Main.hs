@@ -24,36 +24,51 @@ data Aut = Running Int | Adversarial | NFA1 | Bollig Int | NonResidual
   deriving (Show, Read)
 
 -- existential wrapper
-data A = forall q . (Nominal q, Show q) => A (Automaton q Atom)
+data A = forall q . (Nominal q, Show q, Contextual q) => A (Automaton q Atom)
+
+test :: (Show q1, Show q2, Show a, Nominal q1, Nominal q2, Contextual q1, Contextual q2, Nominal a) =>
+        [a] -> Automaton q2 a -> Automaton q1 a -> IO ()
+test str target learned =
+    putStrLn $ "Test: " ++ show str ++ " -> " ++ show (t, m)
+    where t = accepts target str
+          m = accepts learned str
 
 {- HLINT ignore "Redundant $" -}
 mainExample :: String -> String -> String -> IO ()
 mainExample learnerName teacherName autName = do
-    A automaton <- return $ case read autName of
+    A target <- return $ case read autName of
             Running n   -> A $ Examples.runningExample atoms n
             Adversarial -> A $ Examples.adversarial
             NFA1        -> A $ Examples.exampleNFA1
             Bollig n    -> A $ Examples.exampleNFA2 n
             NonResidual -> A $ Examples.exampleNonResidual
     let teacher = case read teacherName of
-            EqDFA         -> teacherWithTarget automaton
-            EqNFA k       -> teacherWithTargetNonDet k automaton
-            EquivalenceIO -> teacherWithTargetAndIO automaton
-    let model = case read learnerName of
+            EqDFA         -> teacherWithTarget target
+            EqNFA k       -> teacherWithTargetNonDet k target
+            EquivalenceIO -> teacherWithTargetAndIO target
+    let learned = case read learnerName of
             NomLStar    -> learnAngluinRows teacher
             NomLStarCol -> learnAngluin teacher
             NomNLStar   -> learnBollig 0 0 teacher
-    print model
-    putStrLn $ "Test: [1, 1] -> " ++ show (accepts automaton [a,a], accepts model [a,a])
+    print $ learned
+    print $ setOrbits $ delta learned
+    test [a,a] target learned
+    test [a,a,a] target learned
+    test [d,d] target learned
+    test [d,d,d] target learned
+    test [e,e] target learned
+    test [e,e,e] target learned
+    test [d,e] target learned
+    test [d,e,e] target learned
 
 mainWithIO :: String -> IO ()
 mainWithIO learnerName = do
     let t = teacherWithIO atoms
-    let model = case read learnerName of
+    let target = case read learnerName of
             NomLStar    -> learnAngluinRows t
             NomLStarCol -> learnAngluin t
             NomNLStar   -> learnBollig 0 0 t
-    print model
+    print target
 
 main :: IO ()
 main = do
