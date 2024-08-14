@@ -7,6 +7,7 @@ import Teacher
 import NLambda hiding (automaton)
 import Prelude hiding (map)
 import System.Environment
+import Examples.Adversarial (advAlpha)
 
 data Learner
   = NomLStar     -- nominal L* for nominal automata
@@ -20,13 +21,13 @@ data Teacher
   | EquivalenceIO -- Teacher with automatic membership but manual equivalence
   deriving (Show, Read)
 
-data Aut = Running Int | Adversarial | NFA1 | Bollig Int | NonResidual
+data Aut = Running Int | Adversarial | Extended | NFA1 | Bollig Int | NonResidual
   deriving (Show, Read)
 
 -- existential wrapper
-data A = forall q . (Nominal q, Show q, Contextual q) => A (Automaton q Atom)
+data A = forall q . (Nominal q, Show q) => A (Automaton q Atom)
 
-test :: (Show q1, Show q2, Show a, Nominal q1, Nominal q2, Contextual q1, Contextual q2, Nominal a) =>
+test :: (Show q1, Show q2, Show a, Nominal q1, Nominal q2, Nominal a) =>
         [a] -> Automaton q2 a -> Automaton q1 a -> IO ()
 test str target learned =
     putStrLn $ "Test: " ++ show str ++ " -> " ++ show (t, m)
@@ -39,6 +40,7 @@ mainExample learnerName teacherName autName = do
     A target <- return $ case read autName of
             Running n   -> A $ Examples.runningExample atoms n
             Adversarial -> A $ Examples.adversarial
+            Extended    -> A $ Examples.extended
             NFA1        -> A $ Examples.exampleNFA1
             Bollig n    -> A $ Examples.exampleNFA2 n
             NonResidual -> A $ Examples.exampleNonResidual
@@ -51,7 +53,9 @@ mainExample learnerName teacherName autName = do
             NomLStarCol -> learnAngluin teacher
             NomNLStar   -> learnBollig 0 0 teacher
     print $ learned
-    print $ setOrbits $ delta learned
+    putStrLn $ "Alphabet: " ++ show advAlpha
+    putStrLn $ "Alphabet orbits: " ++ show (setOrbits advAlpha)
+    putStrLn $ "Alphabet orbits number: " ++ show (setOrbitsNumber advAlpha)
     test [a,a] target learned
     test [a,a,a] target learned
     test [d,d] target learned
