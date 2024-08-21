@@ -7,11 +7,15 @@ import Prelude hiding (and, filter, map, sum)
 import System.Console.Haskeline
 import System.IO.Unsafe (unsafePerformIO)
 import Text.Read (readMaybe)
+import qualified GHC.TypeLits as check
 
 -- Posing a membership query to the terminal and waits for used to input a formula
 ioMembership :: (Show i, Nominal i, Contextual i) => Set [i] -> Set ([i], Formula)
 ioMembership queries = unsafePerformIO $ do
+    -- FIXME: We probably want to cache at the concrete level.
     cache <- readIORef mqCache
+    -- I will add state into whatever i want.
+    constants <- readIORef constantsState
     let cachedAnswers = filter (\(a, _) -> a `member` queries) cache
     let newQueries = simplify $ queries \\ map fst cache
     let representedInputs = toList . mapFilter id . setOrbitsRepresentatives $ newQueries
@@ -29,15 +33,21 @@ ioMembership queries = unsafePerformIO $ do
                         loop
                     Just (Just f) -> return f
         answer <- runInputT defaultSettings loop
-        return $ orbit [] (input, fromBool answer)
+        -- FIXME: Test for orbit consistency:
+        -- If we get back [4,4] === [a,a] === [0,0], but mq [4,4] != mq [0,0]
+        -- then we isolate 0/4. But do we isolate 4 or 0? Maybe there's a way
+        -- to encode the constraint that simply 4 !=== 0
+        return $ orbit constants (input, fromBool answer)
     let answersAsSet = simplify . sum . fromList $ answers
-    writeIORef mqCache (simplify $ cache `union` answersAsSet)
+    -- FIXME: re-enable cache at concrete level.
+    --writeIORef mqCache (simplify $ cache `union` answersAsSet)
     return (simplify $ cachedAnswers `union` answersAsSet)
     where
         -- We use a cache, so that questions will not be repeated.
         -- It is a bit hacky, as the Teacher interface does not allow state...
         {-# NOINLINE mqCache #-}
         mqCache = unsafePerformIO $ newIORef empty
+        constantsState = unsafePerformIO $ newIORef []
 
 
 -- Same as above, but with a machine-readable format
@@ -93,12 +103,17 @@ ioEquivalent hypothesis = unsafePerformIO $ do
                             loop
                         Nothing ->
                             case readMaybe inp of
+                                -- FIXME: Test for orbit consistency:
+                                -- If we get back [4,4] === [a,a] === [0,0], but mq [4,4] != mq [0,0]
+                                -- then we isolate 0/4. But do we isolate 4 or 0? We test to check.
+                                -- If we isolate 4 and this fixes the issue, we commit 4 as a const.
+                                -- If it does not, we isolate 0.
                                 Just f -> return (Just f)
                                 Nothing -> do
                                     outputStrLn "Unable to parse (88), try again"
                                     loop
     answer <- runInputT defaultSettings loop
-    return (orbit [] <$> answer)
+    return (orbit [constant 4] <$> answer)
 
 -- Same as above but in different format.
 -- This is used for automation and benchmarking different nominal tools

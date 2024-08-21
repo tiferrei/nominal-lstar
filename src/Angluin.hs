@@ -12,7 +12,7 @@ import Teacher
 import Data.List (inits, tails)
 import Debug.Trace
 import NLambda hiding (alphabet)
-import Prelude (Bool (..), Maybe (..), error, show, ($), (++), (.))
+import Prelude (Bool (..), Maybe (..), error, show, ($), (++), (.), fst)
 
 
 -- This returns all witnesses (of the form sa) for non-closedness

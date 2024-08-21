@@ -19,6 +19,7 @@ data Teacher
   = EqDFA         -- Automatic teacher with membership and equivalence (only for DFAs)
   | EqNFA Int     -- Automatic teacher with membership and bounded equivalence
   | EquivalenceIO -- Teacher with automatic membership but manual equivalence
+  | ManualDFA     -- Teacher with manual membership and equivalence
   deriving (Show, Read)
 
 data Aut = Running Int | Adversarial | Extended | NFA1 | Bollig Int | NonResidual
@@ -31,8 +32,8 @@ test :: (Show q1, Show q2, Show a, Nominal q1, Nominal q2, Nominal a) =>
         [a] -> Automaton q2 a -> Automaton q1 a -> IO ()
 test str target learned =
     putStrLn $ "Test: " ++ show str ++ " -> " ++ show (t, m)
-    where t = accepts target str
-          m = accepts learned str
+    where t = simplify $ accepts target str
+          m = simplify $ accepts learned str
 
 {- HLINT ignore "Redundant $" -}
 mainExample :: String -> String -> String -> IO ()
@@ -44,18 +45,22 @@ mainExample learnerName teacherName autName = do
             NFA1        -> A $ Examples.exampleNFA1
             Bollig n    -> A $ Examples.exampleNFA2 n
             NonResidual -> A $ Examples.exampleNonResidual
+    putStrLn $ "Target to be learned:\n" ++ show target
     let teacher = case read teacherName of
             EqDFA         -> teacherWithTarget target
             EqNFA k       -> teacherWithTargetNonDet k target
             EquivalenceIO -> teacherWithTargetAndIO target
+            ManualDFA     -> teacherWithIO (NLambda.alphabet target)
     let learned = case read learnerName of
             NomLStar    -> learnAngluinRows teacher
             NomLStarCol -> learnAngluin teacher
             NomNLStar   -> learnBollig 0 0 teacher
     print $ learned
-    putStrLn $ "Alphabet: " ++ show advAlpha
-    putStrLn $ "Alphabet orbits: " ++ show (setOrbits advAlpha)
-    putStrLn $ "Alphabet orbits number: " ++ show (setOrbitsNumber advAlpha)
+    print $ setOrbits $ map Common atoms `union` map Special (fromList [constant 3, constant 4])
+    print $ setOrbits $ map Special (fromList [constant 3, constant 4])
+    print $ orbit [constant 4, constant 3] (constant 0)
+    print $ orbit [constant 4, constant 3] (constant 4)
+
     test [a,a] target learned
     test [a,a,a] target learned
     test [d,d] target learned
