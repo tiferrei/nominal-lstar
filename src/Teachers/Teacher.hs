@@ -2,9 +2,12 @@
 module Teachers.Teacher where
 
 import Data.IORef
+import System.IO.Unsafe (unsafePerformIO)
+import Data.List (find)
 
 import NLambda
-import Prelude hiding (map)
+import Prelude hiding (map, sum)
+import qualified Prelude (map)
 
 -- If during a query, the oracle detects an inconsistency, the new constant
 -- (Left a) is returned, otherwise (Right out) is returned.
@@ -22,14 +25,61 @@ data Teacher i = Teacher
     -- Given a hypothesis, returns Nothing when equivalence or a (equivariant)
     -- set of counter examples. Needs to be quantified over q, because the
     -- learner may choose the type of the state space.
-    , equivalent :: forall q. (Show q, Nominal q) => Automaton q i -> Either [Atom] (Maybe (Set [i]))
+    , equivalent :: forall q. (Show q, Nominal q) => Automaton q i -> Maybe (Set [i])
     -- Returns the alphabet to the learner
     , alphabet   :: Set i
     -- Keeps track of isolated constants
     , constants :: IORef [Atom]
     }
 
--- Often a membership query is defined by a function [i] -> Formula. This wraps
--- such a function to the required type for a membership query (see above).
-foreachQuery :: Nominal i => ([i] -> Formula) -> Set[i] -> Set ([i], Formula)
-foreachQuery f = map (\q -> (q, f q))
+cacheOracle :: (Show i, Nominal i) => ([i] -> Formula) -> [i] -> Formula
+cacheOracle mem q = unsafePerformIO $ do
+    cache <- readIORef cacheState
+    case find (\(i, _) -> i == q) cache of
+        Nothing -> do
+            putStrLn $ "[DEBUG] cache miss: " ++ (show q)
+            let o = mem q
+            writeIORef cacheState ((q, o) : cache)
+            return o
+        Just (_, o) -> do
+            putStrLn $ "[DEBUG] cache hit: " ++ (show q)
+            return o
+    where
+        cacheState = unsafePerformIO $ newIORef []
+
+mqGeneraliser :: (Show i, Nominal i, Contextual i) => IORef [Atom] -> ([i] -> Formula) -> Set [i] -> Set ([i], Formula)
+mqGeneraliser constsState mem qs = unsafePerformIO $ do
+    consts <- readIORef constsState
+    let oracle = cacheOracle mem
+    let queries = toList . mapFilter id . setOrbitsRepresentatives $ qs
+    let answers = Prelude.map (\q -> orbit consts (q, oracle q)) queries
+    return . simplify . sum . fromList $ answers
+
+eqGeneraliser :: (Show i, Nominal i, Contextual i) => IORef [Atom] -> ([i] -> Formula) -> (Automaton q i -> Maybe [i]) -> Automaton q i -> Maybe (Set [i])
+eqGeneraliser constsState mem equiv hyp = unsafePerformIO $ do
+    let answer = equiv hyp
+    let oracle = cacheOracle mem
+    case answer of
+        Nothing -> return Nothing
+        Just cex -> do
+            -- I will add state into whatever i want.
+            consts <- readIORef constsState
+            putStrLn ("[DEBUG] current constants: " ++ show consts)
+            putStrLn ("[DEBUG] cex given: " ++ show cex)
+            let abstract = orbit consts cex
+                rep = head . toList . mapFilter id . setOrbitsRepresentatives $ abstract
+            putStrLn ("[DEBUG] abstracted: " ++ show abstract)
+            putStrLn ("[DEBUG] representative: " ++ show rep)
+            if cex == rep then
+                return (Just (orbit consts cex))
+            else
+                if isTrue (oracle cex <==> oracle rep) then
+                    return (Just (orbit consts cex))
+                else do
+                    -- FIXME: Need to work out the logic to isolate the constant.
+                    -- For now, just add everything. Not minimal / efficient but
+                    -- should be correct.
+                    let newConstants = consts ++ leastSupport cex ++ leastSupport rep
+                    putStrLn ("[DEBUG] new constants: " ++ show newConstants)
+                    writeIORef constsState newConstants
+                    return (Just (orbit newConstants cex))

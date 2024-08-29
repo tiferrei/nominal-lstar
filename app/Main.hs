@@ -7,7 +7,6 @@ import Teacher
 import NLambda hiding (automaton)
 import Prelude hiding (map)
 import System.Environment
-import Examples.Adversarial (advAlpha)
 
 data Learner
   = NomLStar     -- nominal L* for nominal automata

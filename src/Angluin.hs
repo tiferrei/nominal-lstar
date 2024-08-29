@@ -91,6 +91,7 @@ learnLoop cexHandler teacher t =
                         trace ("newcols = " ++ show newColumns) $
                         learnLoop cexHandler teacher state2
                     Succes ->
+                        traceShow t $
                         traceShow hyp $
                         trace "3. Equivalent? " $
                         eqloop t hyp

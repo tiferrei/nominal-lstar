@@ -19,14 +19,14 @@ import qualified Prelude      ()
 import           GHC.Generics (Generic)
 
 a :: Atom
-a = atom "a"
+a = constant 1
 
 d :: Atom
-d = atom "d"
+d = constant 4
 
 
 e :: Atom
-e = atom "e"
+e = constant 5
 
 data AdvAlpha a = Common a | Special a
   deriving (Eq, Ord, Show, Read, Generic, Nominal, Contextual)
