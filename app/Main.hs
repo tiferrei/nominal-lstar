@@ -55,10 +55,6 @@ mainExample learnerName teacherName autName = do
             NomLStarCol -> learnAngluin teacher
             NomNLStar   -> learnBollig 0 0 teacher
     print $ learned
-    print $ setOrbits $ map Common atoms `union` map Special (fromList [constant 3, constant 4])
-    print $ setOrbits $ map Special (fromList [constant 3, constant 4])
-    print $ orbit [constant 4, constant 3] (constant 0)
-    print $ orbit [constant 4, constant 3] (constant 4)
 
     test [a,a] target learned
     test [a,a,a] target learned

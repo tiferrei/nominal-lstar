@@ -12,7 +12,7 @@ import Teacher
 import Data.List (inits, tails)
 import Debug.Trace
 import NLambda hiding (alphabet)
-import Prelude (Bool (..), Maybe (..), error, show, ($), (++), (.), fst)
+import Prelude (Bool (..), Maybe (..), Either (..), error, show, ($), (++), (.))
 
 
 -- This returns all witnesses (of the form sa) for non-closedness
@@ -97,8 +97,10 @@ learnLoop cexHandler teacher t =
                         eqloop t hyp
                         where
                             eqloop s2 h = case equivalent teacher h of
-                                            Nothing -> trace "Yes" h
-                                            Just ces -> trace "No" $
+                                            Left _ -> trace "Found new constants! Restarting..." $
+                                                learnLoop cexHandler teacher (reset (mqToBool teacher) (alphabet teacher))
+                                            Right Nothing -> trace "Yes" h
+                                            Right (Just ces) -> trace "No" $
                                                 if isTrue . isEmpty $ realces h ces
                                                     then eqloop s2 h
                                                     else

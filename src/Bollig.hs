@@ -13,7 +13,7 @@ import Teacher
 import Data.List (tails)
 import Debug.Trace (trace, traceShow)
 import NLambda hiding (alphabet)
-import Prelude (Bool (..), Int, Maybe (..), Show (..), ($), (++), (.))
+import Prelude (Bool (..), Int, Maybe (..), Either (..), Show (..), error, ($), (++), (.))
 
 -- Comparing two graphs of a function is inefficient in NLambda,
 -- because we do not have a map data structure. (So the only way
@@ -100,8 +100,9 @@ learnBolligLoop teacher t =
                         eqloop t hyp
                         where
                             eqloop s2 h = case equivalent teacher h of
-                                            Nothing -> trace "Yes" h
-                                            Just ces -> trace "No" $
+                                            Left _ -> error "Bolling learner does not support learning constants."
+                                            Right Nothing -> trace "Yes" h
+                                            Right (Just ces) -> trace "No" $
                                                 if isTrue . isEmpty $ realces h ces
                                                     then eqloop s2 h
                                                     else

@@ -61,6 +61,8 @@ instance (Nominal i, Contextual i) => ObservationTable (Table i) i Bool where
             newPartRed = newPart \\ domain
             newContent = mqToSubset mq newPartRed
 
+    reset = initialBTable
+
 
 initialBTableWith :: Nominal i => MQ i Bool -> Set i -> Set (RowIndex i) -> Set (ColumnIndex i) -> Table i
 initialBTableWith mq alphabet newRows newColumns = Table

@@ -66,6 +66,7 @@ instance (Nominal i, Nominal o) => ObservationTable (Table i o) i o where
             newPartRed = newPart \\ dom content
             newContent = mq newPartRed
 
+    reset = initialTable
 
 -- We can reuse the above tables for the Boolean case and
 -- perform some minor optimisations.
@@ -87,6 +88,7 @@ instance (Nominal i) => ObservationTable (BTable i) i Bool where
     tableAt = coerce (tableAt :: _ => Table i Bool -> _)
     addRows = coerce (addRows :: _ => _ -> _ -> Table i Bool -> Table i Bool)
     addColumns = coerce (addColumns :: _ => _ -> _ -> Table i Bool -> Table i Bool)
+    reset = coerce (reset :: _ => _ -> _ -> Table i Bool)
 
     -- These are specific to our representation of Row
     row (B Table{..}) r = let lang = mapFilter (\(i, o) -> maybeIf (fromBool o) i) content
