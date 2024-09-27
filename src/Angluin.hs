@@ -19,7 +19,7 @@ import Prelude (Bool (..), Maybe (..), Either (..), error, show, ($), (++), (.))
 closednessTest :: (Nominal i, _) => table -> TestResult i
 closednessTest t = case solve (isEmpty defect) of
     Just True  -> Succes
-    Just False -> trace "Not closed" $ Failed defect empty
+    Just False -> Failed defect empty
     Nothing    -> let err = error "@@@ Unsolvable (closednessTest) @@@" in Failed err err
     where
         allRows = map (row t) (rows t)
@@ -71,40 +71,34 @@ learnAngluinRows teacher = learnLoop useCounterExampleAngluin teacher (OT.initia
 
 learnLoop :: (Nominal i, ObservationTable table i Bool, _) => _ -> Teacher i -> table -> Automaton (Row table) i
 learnLoop cexHandler teacher t =
-    let
-        -- No worry, these are computed lazily
-        closednessRes = closednessTest t
-        consistencyRes = consistencyTestDirect t
+    trace "1. Making it closed" $
+    case closednessTest t of
+        Failed newRows _ ->
+            let state2 = addRows (mqToBool teacher) newRows t in
+            trace ("newrows = " ++ show newRows) $
+            learnLoop cexHandler teacher state2
+        Succes ->
+            trace "2. Making it consistent" $
+            case consistencyTestDirect t of
+                Failed _ newColumns ->
+                    let state2 = addColumns (mqToBool teacher) newColumns t in
+                    trace ("newcols = " ++ show newColumns) $
+                    learnLoop cexHandler teacher state2
+                Succes ->
+                    traceShow hyp $
+                    trace "3. Equivalent? " $
+                    eqloop t hyp
+    where
         hyp = constructHypothesis t
-    in
-        trace "1. Making it closed" $
-        case closednessRes of
-            Failed newRows _ ->
-                let state2 = addRows (mqToBool teacher) newRows t in
-                trace ("newrows = " ++ show newRows) $
-                learnLoop cexHandler teacher state2
-            Succes ->
-                trace "2. Making it consistent" $
-                case consistencyRes of
-                    Failed _ newColumns ->
-                        let state2 = addColumns (mqToBool teacher) newColumns t in
-                        trace ("newcols = " ++ show newColumns) $
-                        learnLoop cexHandler teacher state2
-                    Succes ->
-                        traceShow t $
-                        traceShow hyp $
-                        trace "3. Equivalent? " $
-                        eqloop t hyp
-                        where
-                            eqloop s2 h = case equivalent teacher h of
-                                            Left _ -> trace "Found new constants! Restarting..." $
-                                                learnLoop cexHandler teacher (reset (mqToBool teacher) (alphabet teacher))
-                                            Right Nothing -> trace "Yes" h
-                                            Right (Just ces) -> trace "No" $
-                                                if isTrue . isEmpty $ realces h ces
-                                                    then eqloop s2 h
-                                                    else
-                                                        let s3 = cexHandler teacher ces s2 in
-                                                        trace ("Using ce: " ++ show ces) $
-                                                        learnLoop cexHandler teacher s3
-                            realces h ces = NLambda.filter (\(ce, a) -> a `neq` accepts h ce) $ membership teacher ces
+        eqloop s2 h = case equivalent teacher h of
+                        Left _ -> trace "Found new constants! Restarting..." $
+                            learnLoop cexHandler teacher (reset (mqToBool teacher) (alphabet teacher))
+                        Right Nothing -> trace "Yes" h
+                        Right (Just ces) -> trace "No" $
+                            if isTrue . isEmpty $ realces h ces
+                                then eqloop s2 h
+                                else
+                                    let s3 = cexHandler teacher ces s2 in
+                                    trace ("Using ce: " ++ show ces) $
+                                    learnLoop cexHandler teacher s3
+        realces h ces = NLambda.filter (\(ce, a) -> a `neq` accepts h ce) $ membership teacher ces

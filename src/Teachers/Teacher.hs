@@ -51,9 +51,8 @@ mqGeneraliser :: (Show i, Nominal i, Contextual i) => IORef [Atom] -> ([i] -> Fo
 mqGeneraliser constsState mem qs = unsafePerformIO $ do
     consts <- readIORef constsState
     let oracle = cacheOracle mem
-    let queries = toList . mapFilter id . setOrbitsRepresentatives $ qs
-    let answers = Prelude.map (\q -> orbit consts (q, oracle q)) queries
-    return . simplify . sum . fromList $ answers
+    let answers = map (\q -> orbit consts (q, oracle q)) qs
+    return . simplify . sum $ answers
 
 eqGeneraliser :: (Show i, Nominal i, Contextual i) => IORef [Atom] -> ([i] -> Formula) -> (Automaton q i -> Maybe [i]) -> Automaton q i -> Either [Atom] (Maybe (Set [i]))
 eqGeneraliser constsState mem equiv hyp = unsafePerformIO $ do
