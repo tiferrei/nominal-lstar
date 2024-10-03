@@ -40,10 +40,10 @@ consistencyTestDirect t = case solve (isEmpty defect) of
 -- Given a C&C table, constructs an automaton. The states are given by 2^E (not
 -- necessarily equivariant functions)
 constructHypothesis :: (Nominal i, _) => table -> Automaton (Row table) i
-constructHypothesis t = simplify $ automaton (simplify $ map simplify q) (simplify $ alph t) (simplify (map (\(ss,v,ds) -> (simplify ss, v, simplify ds)) d)) (map simplify i) (map simplify f)
+constructHypothesis t = simplify $ automaton q (alph t) d i f
     where
-        q = simplify $ map (simplify $ row t) (rows t)
-        d = simplify $ pairsWith (\s a -> (simplify $ row t s, a, simplify $ row t (s ++ [a]))) (simplify $ rows t) (alph t)
+        q = map (row t) (rows t)
+        d = pairsWith (\s a -> (row t s, a, row t (s ++ [a]))) (rows t) (alph t)
         i = singleton (rowEps t)
         f = filter (`contains` []) q
 

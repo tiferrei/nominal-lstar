@@ -41,25 +41,23 @@ instance (Nominal i, Contextual i) => ObservationTable (Table i) i Bool where
 
     addRows mq newRows t@Table{..} =
         t { content = content `union` newContent
-          , domain = domain `union` newPartRed
+          , domain = domain `union` newPart
           , rowIndices = rowIndices `union` newRows
           }
         where
             newRowsExt = pairsWith (\r a -> r ++ [a]) newRows aa
             newPart = pairsWith (++) (newRows `union` newRowsExt) colIndices
-            newPartRed = newPart \\ domain
-            newContent = mqToSubset mq newPartRed
+            newContent = mqToSubset mq newPart
 
     addColumns mq newColumns t@Table{..} =
         t { content = content `union` newContent
-          , domain = domain `union` newPartRed
+          , domain = domain `union` newPart
           , colIndices = colIndices `union` newColumns
           }
         where
             newColumnsExt = pairsWith (:) aa newColumns
             newPart = pairsWith (++) rowIndices (newColumns `union` newColumnsExt)
-            newPartRed = newPart \\ domain
-            newContent = mqToSubset mq newPartRed
+            newContent = mqToSubset mq newPart
 
     reset = initialBTable
 

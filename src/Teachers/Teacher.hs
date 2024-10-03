@@ -35,24 +35,32 @@ data Teacher i = Teacher
 cacheOracle :: (Show i, Nominal i) => ([i] -> Formula) -> [i] -> Formula
 cacheOracle mem q = unsafePerformIO $ do
     cache <- readIORef cacheState
-    case find (\(i, _) -> i == q) cache of
+    out <- case find (\(i, _) -> i == q) cache of
         Nothing -> do
             let o = mem q
             putStrLn $ "[DEBUG] cache miss: " ++ show q ++ " -> " ++ show o
             writeIORef cacheState ((q, o) : cache)
+            count <- readIORef counter
+            writeIORef counter (count + 1)
             return o
         Just (_, o) -> do
             putStrLn $ "[DEBUG] cache hit: " ++ show q ++ " -> " ++ show o
             return o
+    count <- readIORef counter
+    putStrLn $ "[DEBUG] QUERIES: " ++ show count
+    return out
     where
         cacheState = unsafePerformIO $ newIORef []
+        counter = unsafePerformIO $ newIORef 0
 
 mqGeneraliser :: (Show i, Nominal i, Contextual i) => IORef [Atom] -> ([i] -> Formula) -> Set [i] -> Set ([i], Formula)
 mqGeneraliser constsState mem qs = unsafePerformIO $ do
     consts <- readIORef constsState
     let oracle = cacheOracle mem
-    let answers = map (\q -> orbit consts (q, oracle q)) qs
-    return . simplify . sum $ answers
+    -- FIXME: This should integrate more tightly with cache.
+    let queries = toList . mapFilter id . setOrbitsRepresentatives . simplify $ qs
+    let answers = Prelude.map (\q -> orbit consts (q, oracle q)) queries
+    return . simplify . sum . fromList $ answers
 
 eqGeneraliser :: (Show i, Nominal i, Contextual i) => IORef [Atom] -> ([i] -> Formula) -> (Automaton q i -> Maybe [i]) -> Automaton q i -> Either [Atom] (Maybe (Set [i]))
 eqGeneraliser constsState mem equiv hyp = unsafePerformIO $ do
