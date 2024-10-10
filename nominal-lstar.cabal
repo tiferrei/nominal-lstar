@@ -22,6 +22,7 @@ library
     Angluin,
     Bollig,
     BooleanObservationTable,
+    EnhancedObservationTable,
     Examples,
     Examples.Contrived,
     Examples.ContrivedNFAs,

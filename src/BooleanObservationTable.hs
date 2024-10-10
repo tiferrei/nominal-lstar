@@ -11,7 +11,7 @@ import ObservationTableClass
 
 import GHC.Generics (Generic)
 import NLambda
-import Prelude (Bool (..), Eq, Int, Ord, Show (..), (++), (.))
+import Prelude (Bool (..), Eq, Int, Ord, Show (..), (++), (.), error)
 import qualified Prelude ()
 
 -- Helper function
@@ -59,7 +59,7 @@ instance (Nominal i, Contextual i) => ObservationTable (Table i) i Bool where
             newPart = pairsWith (++) rowIndices (newColumns `union` newColumnsExt)
             newContent = mqToSubset mq newPart
 
-    reset = initialBTable
+    addConstants = error "BooleanObservationTable: addConstants not implemented!"
 
 
 initialBTableWith :: Nominal i => MQ i Bool -> Set i -> Set (RowIndex i) -> Set (ColumnIndex i) -> Table i

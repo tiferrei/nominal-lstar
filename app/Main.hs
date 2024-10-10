@@ -56,6 +56,8 @@ mainExample learnerName teacherName autName = do
             NomNLStar   -> learnBollig 0 0 teacher
     print $ learned
 
+    test [constant 0, constant 0] target learned
+    test [constant 0, constant 0, constant 0] target learned
     test [a,a] target learned
     test [a,a,a] target learned
     test [d,d] target learned

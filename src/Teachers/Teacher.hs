@@ -51,6 +51,7 @@ cacheOracle mem q = unsafePerformIO $ do
     return out
     where
         cacheState = unsafePerformIO $ newIORef []
+        counter :: IORef Integer
         counter = unsafePerformIO $ newIORef 0
 
 mqGeneraliser :: (Show i, Nominal i, Contextual i) => IORef [Atom] -> ([i] -> Formula) -> Set [i] -> Set ([i], Formula)

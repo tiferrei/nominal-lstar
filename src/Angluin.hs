@@ -6,18 +6,18 @@ module Angluin where
 
 import AbstractLStar
 import ObservationTableClass
-import qualified BooleanObservationTable as OT
+import qualified EnhancedObservationTable as OT
 import Teacher
 
 import Data.List (inits, tails)
 import Debug.Trace
 import NLambda hiding (alphabet)
-import Prelude (Bool (..), Maybe (..), Either (..), error, show, ($), (++), (.))
+import Prelude (Bool (..), Maybe (..), Either (..), error, show, ($), (++), (.), id )
 
 
 -- This returns all witnesses (of the form sa) for non-closedness
 closednessTest :: (Nominal i, _) => table -> TestResult i
-closednessTest t = case solve (isEmpty defect) of
+closednessTest t = case solve (traceShowId $ isEmpty defect) of
     Just True  -> Succes
     Just False -> Failed defect empty
     Nothing    -> let err = error "@@@ Unsolvable (closednessTest) @@@" in Failed err err
@@ -50,8 +50,8 @@ constructHypothesis t = simplify $ automaton q (alph t) d i f
 -- Extends the table with all prefixes of a set of counter examples.
 useCounterExampleAngluin :: (Nominal i, _) => Teacher i -> Set [i] -> table -> table
 useCounterExampleAngluin teacher ces t =
-    let newRows = sum . map (fromList . inits) $ ces
-        newRowsRed = newRows \\ rows t
+    let newRows = traceShowId $ sum . map (fromList . inits) $ ces
+        newRowsRed = traceShowId $ newRows \\ rows t
      in addRows (mqToBool teacher) newRowsRed t
 
 -- This is the variant by Maler and Pnueli: Adds all suffixes as columns
@@ -75,14 +75,14 @@ learnLoop cexHandler teacher t =
     case closednessTest t of
         Failed newRows _ ->
             let state2 = addRows (mqToBool teacher) newRows t in
-            trace ("newrows = " ++ show newRows) $
+            trace ("newrows = " ++ show (simplify newRows)) $
             learnLoop cexHandler teacher state2
         Succes ->
             trace "2. Making it consistent" $
             case consistencyTestDirect t of
                 Failed _ newColumns ->
                     let state2 = addColumns (mqToBool teacher) newColumns t in
-                    trace ("newcols = " ++ show newColumns) $
+                    trace ("newcols = " ++ show (simplify newColumns)) $
                     learnLoop cexHandler teacher state2
                 Succes ->
                     traceShow hyp $
@@ -91,8 +91,8 @@ learnLoop cexHandler teacher t =
     where
         hyp = constructHypothesis t
         eqloop s2 h = case equivalent teacher h of
-                        Left _ -> trace "Found new constants! Restarting..." $
-                            learnLoop cexHandler teacher (reset (mqToBool teacher) (alphabet teacher))
+                        Left consts -> trace "Found new constants! Refining table..." $
+                            learnLoop cexHandler teacher (addConstants consts t)
                         Right Nothing -> trace "Yes" h
                         Right (Just ces) -> trace "No" $
                             if isTrue . isEmpty $ realces h ces
