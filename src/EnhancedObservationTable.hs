@@ -16,8 +16,8 @@ import qualified Prelude ()
 import Debug.Trace (traceShowId)
 
 -- Helper function
-mqToSubset :: Nominal i => (Set [i] -> Set ([i], Bool)) -> Set [i] -> Set [i]
-mqToSubset mq = mapFilter (\(i, o) -> maybeIf (fromBool o) i) . mq
+mqToSubset :: Nominal i => ([i] -> Bool) -> Set (Set [i], [i]) -> Set (Set [i], [i])
+mqToSubset mq = mapFilter (\(i, o) -> maybeIf (fromBool o) i) . map (\(a, c) -> ((a, c), mq c))
 
 toPairs :: (Nominal i, Contextual i) => [Atom] -> Set i -> Set (Set i, i)
 toPairs consts s = map (\o -> (o, reps o)) orbits
@@ -53,27 +53,28 @@ instance (Show i, Nominal i, Contextual i) => ObservationTable (Table i) i Bool 
     tableAt Table{..} r c = ite ((r ++ c) `member` sum (map fst content)) (singleton True) (singleton False)
 
     addRows mq newRows t@Table{..} =
-        traceShowId t { content = content `union` toPairs consts newContent
-          , domain = domain `union` toPairs consts newPart
+        traceShowId t { content = content `union` newContent
+          , domain = domain `union` newPart
           , rowIndices = rowIndices `union` toPairs consts newRows
           }
         where
             newRowsExt = pairsWith (\r a -> r ++ [a]) newRows aa
-            newPart = pairsWith (++) (newRows `union` newRowsExt) (sum $ map fst colIndices)
+            newPart = toPairs consts $ pairsWith (++) (newRows `union` newRowsExt) (sum $ map fst colIndices)
             newContent = mqToSubset mq newPart
 
     addColumns mq newColumns t@Table{..} =
-        traceShowId t { content = content `union` toPairs consts newContent
-          , domain = domain `union` toPairs consts newPart
+        traceShowId t { content = content `union` newContent
+          , domain = domain `union` newPart
           , colIndices = colIndices `union` toPairs consts newColumns
           }
         where
             newColumnsExt = pairsWith (:) aa newColumns
-            newPart = pairsWith (++) (sum $ map fst rowIndices) (newColumns `union` newColumnsExt)
+            newPart = toPairs consts $ pairsWith (++) (sum $ map fst rowIndices) (newColumns `union` newColumnsExt)
             newContent = mqToSubset mq newPart
 
     addConstants addConsts t@Table{..} =
         traceShowId t {
+            -- FIXME: Can probably be optimised.
             content = toPairs newConsts (sum $ map fst content),
             domain = toPairs newConsts (sum $ map fst domain),
             rowIndices = toPairs newConsts (sum $ map fst rowIndices),
@@ -84,8 +85,8 @@ instance (Show i, Nominal i, Contextual i) => ObservationTable (Table i) i Bool 
 
 initialBTableWith :: (Nominal i, Contextual i) => MQ i Bool -> Set i -> Set (RowIndex i) -> Set (ColumnIndex i) -> Table i
 initialBTableWith mq alphabet newRows newColumns = Table
-    { content = toPairs [] content
-    , domain = toPairs [] domain
+    { content = content
+    , domain = domain
     , rowIndices = toPairs [] newRows
     , colIndices = toPairs [] newColumns
     , aa = alphabet
@@ -93,7 +94,7 @@ initialBTableWith mq alphabet newRows newColumns = Table
     }
     where
         newColumnsExt = mapFilter id . setOrbitsRepresentatives $ pairsWith (:) alphabet newColumns
-        domain = pairsWith (++) newRows (newColumns `union` newColumnsExt)
+        domain = toPairs [] $ pairsWith (++) newRows (newColumns `union` newColumnsExt)
         content = mqToSubset mq domain
 
 initialBTable :: (Nominal i, Contextual i) => MQ i Bool -> Set i -> Table i

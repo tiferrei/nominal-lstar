@@ -5,15 +5,14 @@
 module Bollig where
 
 import AbstractLStar
-import qualified BooleanObservationTable as BOT
+import qualified EnhancedObservationTable as OT
 import ObservationTableClass
-import qualified SimpleObservationTable as SOT
 import Teacher
 
 import Data.List (tails)
 import Debug.Trace (trace, traceShow)
 import NLambda hiding (alphabet)
-import Prelude (Bool (..), Int, Maybe (..), Either (..), Show (..), error, ($), (++), (.))
+import Prelude (Bool (..), Int, Maybe (..), Show (..), ($), (++))
 
 -- Comparing two graphs of a function is inefficient in NLambda,
 -- because we do not have a map data structure. (So the only way
@@ -55,18 +54,14 @@ constructHypothesisBollig primesUpp t = automaton q (alph t) d i f
 
 -- Adds all suffixes as columns
 -- TODO: do actual Rivest and Schapire
-addCounterExample :: (Nominal i, _) => MQ i Bool -> Set [i] -> table -> table
+addCounterExample :: (Nominal i, _) => MQ i Bool -> [i] -> table -> table
 addCounterExample mq ces t =
-    let newColumns = sum . map (fromList . tails) $ ces
+    let newColumns = fromList $ tails ces
         newColumnsRed = newColumns \\ cols t
      in addColumns mq newColumnsRed t
 
 learnBollig :: (Nominal i, _) => Int -> Int -> Teacher i -> Automaton _ i
-learnBollig k n teacher = learnBolligLoop teacher (BOT.initialBTableSize (mqToBool teacher) (alphabet teacher) k n)
-
--- Slow version
-learnBolligOld :: (Nominal i, _) => Int -> Int -> Teacher i -> Automaton _ i
-learnBolligOld k n teacher = learnBolligLoop teacher (SOT.initialBTableSize (mqToBool teacher) (alphabet teacher) k n)
+learnBollig k n teacher = learnBolligLoop teacher (OT.initialBTableSize (membership teacher) (alphabet teacher) k n)
 
 learnBolligLoop :: (Nominal i, _) => Teacher i -> table -> Automaton (Row table) i
 learnBolligLoop teacher t =
@@ -84,14 +79,14 @@ learnBolligLoop teacher t =
         trace "1. Making it rfsa closed" $
         case closednessRes of
             Failed newRows _ ->
-                let state2 = addRows (mqToBool teacher) newRows t in
+                let state2 = addRows (membership teacher) newRows t in
                 trace ("newrows = " ++ show newRows) $
                 learnBolligLoop teacher state2
             Succes ->
                 trace "2. Making it rfsa consistent" $
                 case consistencyRes of
                     Failed _ newColumns ->
-                        let state2 = addColumns (mqToBool teacher) newColumns t in
+                        let state2 = addColumns (membership teacher) newColumns t in
                         trace ("newcols = " ++ show newColumns) $
                         learnBolligLoop teacher state2
                     Succes ->
@@ -100,13 +95,8 @@ learnBolligLoop teacher t =
                         eqloop t hyp
                         where
                             eqloop s2 h = case equivalent teacher h of
-                                            Left _ -> error "Bolling learner does not support learning constants."
-                                            Right Nothing -> trace "Yes" h
-                                            Right (Just ces) -> trace "No" $
-                                                if isTrue . isEmpty $ realces h ces
-                                                    then eqloop s2 h
-                                                    else
-                                                        let s3 = addCounterExample (mqToBool teacher) ces s2 in
-                                                        trace ("Using ce: " ++ show ces) $
-                                                        learnBolligLoop teacher s3
-                            realces h ces = NLambda.filter (\(ce, a) -> a `neq` accepts h ce) $ membership teacher ces
+                                            Nothing -> trace "Yes" h
+                                            Just (_, ces) -> trace "No" $
+                                                let s3 = addCounterExample (membership teacher) ces s2 in
+                                                trace ("Using ce: " ++ show ces) $
+                                                learnBolligLoop teacher s3

@@ -8,7 +8,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import Text.Read (readMaybe)
 
 -- Posing a membership query to the terminal and waits for used to input a formula
-ioMembership :: (Show i, Nominal i, Contextual i) => [i] -> Formula
+ioMembership :: (Show i, Nominal i, Contextual i) => [i] -> Bool
 ioMembership query = unsafePerformIO $ do
     putStr "Q: "
     print query
@@ -20,11 +20,10 @@ ioMembership query = unsafePerformIO $ do
                     outputStrLn "Unable to parse, try again"
                     loop
                 Just (Just f) -> return f
-    answer <- runInputT defaultSettings loop
-    return . fromBool $ answer
+    runInputT defaultSettings loop
 
 -- Same as above, but with a machine-readable format
-ioMembership2 :: (Show i, Nominal i, Contextual i) => [i] -> Formula
+ioMembership2 :: (Show i, Nominal i, Contextual i) => [i] -> Bool
 ioMembership2 query = unsafePerformIO $ do
     let str = unwords . fmap show $ query
     putStrLn $ "MQ \"" ++ str ++ "\""
@@ -34,8 +33,7 @@ ioMembership2 query = unsafePerformIO $ do
                 Just "Y" -> return True
                 Just "N" -> return False
                 _        -> error "Unable to parse, or quit. Bye!"
-    answer <- runInputT defaultSettings askit
-    return . fromBool $ answer
+    runInputT defaultSettings askit
 
 newtype TestIO i = T [i]
   deriving (Show, Read, Eq, Ord)

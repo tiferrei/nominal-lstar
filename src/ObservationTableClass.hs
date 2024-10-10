@@ -12,7 +12,7 @@ type RowIndex i = [i]
 type ColumnIndex i = [i]
 
 -- Membership queries (TODO: move to Teacher)
-type MQ i o = Set [i] -> Set ([i], o)
+type MQ i o = [i] -> o
 
 -- This is a fat class, so that instances could give more efficient implementations
 class (Nominal table, Nominal i, Nominal o) => ObservationTable table i o | table -> i o where

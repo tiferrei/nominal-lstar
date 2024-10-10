@@ -12,7 +12,7 @@ import Teacher
 import Data.List (inits, tails)
 import Debug.Trace
 import NLambda hiding (alphabet)
-import Prelude (Bool (..), Maybe (..), Either (..), error, show, ($), (++), (.), id )
+import Prelude (Bool (..), Maybe (..), error, show, ($), (++), (.), null)
 
 
 -- This returns all witnesses (of the form sa) for non-closedness
@@ -48,40 +48,40 @@ constructHypothesis t = simplify $ automaton q (alph t) d i f
         f = filter (`contains` []) q
 
 -- Extends the table with all prefixes of a set of counter examples.
-useCounterExampleAngluin :: (Nominal i, _) => Teacher i -> Set [i] -> table -> table
+useCounterExampleAngluin :: (Nominal i, _) => Teacher i -> [i] -> table -> table
 useCounterExampleAngluin teacher ces t =
-    let newRows = traceShowId $ sum . map (fromList . inits) $ ces
-        newRowsRed = traceShowId $ newRows \\ rows t
-     in addRows (mqToBool teacher) newRowsRed t
+    let newRows = fromList $ inits ces
+        newRowsRed = newRows \\ rows t
+     in addRows (membership teacher) newRowsRed t
 
 -- This is the variant by Maler and Pnueli: Adds all suffixes as columns
-useCounterExampleMP :: (Nominal i, _) => Teacher i -> Set [i] -> table -> table
+useCounterExampleMP :: (Nominal i, _) => Teacher i -> [i] -> table -> table
 useCounterExampleMP teacher ces t =
-    let newColumns = sum . map (fromList . tails) $ ces
+    let newColumns = fromList $ tails ces
         newColumnsRed = newColumns \\ cols t
-     in addColumns (mqToBool teacher) newColumnsRed t
+     in addColumns (membership teacher) newColumnsRed t
 
 -- Default: use counter examples in columns, which is slightly faster
 learnAngluin :: (Nominal i, _) => Teacher i -> Automaton _ i
-learnAngluin teacher = learnLoop useCounterExampleMP teacher (OT.initialBTable (mqToBool teacher) (alphabet teacher))
+learnAngluin teacher = learnLoop useCounterExampleMP teacher (OT.initialBTable (membership teacher) (alphabet teacher))
 
 -- The "classical" version, where counter examples are added as rows
 learnAngluinRows :: (Nominal i, _) => Teacher i -> Automaton _ i
-learnAngluinRows teacher = learnLoop useCounterExampleAngluin teacher (OT.initialBTable (mqToBool teacher) (alphabet teacher))
+learnAngluinRows teacher = learnLoop useCounterExampleAngluin teacher (OT.initialBTable (membership teacher) (alphabet teacher))
 
 learnLoop :: (Nominal i, ObservationTable table i Bool, _) => _ -> Teacher i -> table -> Automaton (Row table) i
 learnLoop cexHandler teacher t =
     trace "1. Making it closed" $
     case closednessTest t of
         Failed newRows _ ->
-            let state2 = addRows (mqToBool teacher) newRows t in
+            let state2 = addRows (membership teacher) newRows t in
             trace ("newrows = " ++ show (simplify newRows)) $
             learnLoop cexHandler teacher state2
         Succes ->
             trace "2. Making it consistent" $
             case consistencyTestDirect t of
                 Failed _ newColumns ->
-                    let state2 = addColumns (mqToBool teacher) newColumns t in
+                    let state2 = addColumns (membership teacher) newColumns t in
                     trace ("newcols = " ++ show (simplify newColumns)) $
                     learnLoop cexHandler teacher state2
                 Succes ->
@@ -91,14 +91,9 @@ learnLoop cexHandler teacher t =
     where
         hyp = constructHypothesis t
         eqloop s2 h = case equivalent teacher h of
-                        Left consts -> trace "Found new constants! Refining table..." $
-                            learnLoop cexHandler teacher (addConstants consts t)
-                        Right Nothing -> trace "Yes" h
-                        Right (Just ces) -> trace "No" $
-                            if isTrue . isEmpty $ realces h ces
-                                then eqloop s2 h
-                                else
-                                    let s3 = cexHandler teacher ces s2 in
-                                    trace ("Using ce: " ++ show ces) $
-                                    learnLoop cexHandler teacher s3
-        realces h ces = NLambda.filter (\(ce, a) -> a `neq` accepts h ce) $ membership teacher ces
+                        Nothing -> trace "Yes" h
+                        Just (consts, ces) -> trace "No" $
+                            let s3 = if null consts then s2 else addConstants consts s2 in
+                            let s4 = cexHandler teacher ces s3 in
+                            trace ("Using ce: " ++ show ces) $
+                            learnLoop cexHandler teacher s4
