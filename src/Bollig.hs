@@ -5,7 +5,7 @@
 module Bollig where
 
 import AbstractLStar
-import qualified EnhancedObservationTable as OT
+import qualified SimpleObservationTable as OT
 import ObservationTableClass
 import Teacher
 

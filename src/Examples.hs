@@ -8,6 +8,7 @@ module Examples
     , module Examples.RunningExample
     , module Examples.Adversarial
     , module Examples.Stack
+    , module Examples.Mealy
     ) where
 
 import Examples.Contrived
@@ -18,6 +19,7 @@ import Examples.Residual
 import Examples.RunningExample
 import Examples.Adversarial
 import Examples.Stack
+import Examples.Mealy
 import NLambda (Atom)
 import Teacher (Teacher, teacherWithTarget)
 

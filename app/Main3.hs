@@ -37,6 +37,7 @@ test str target learned =
 {- HLINT ignore "Redundant $" -}
 mainExample :: String -> String -> String -> IO ()
 mainExample learnerName teacherName autName = do
+
     A target <- return $ case read autName of
             Running n   -> A $ Examples.runningExample atoms n
             Adversarial -> A $ Examples.adversarial
@@ -55,14 +56,6 @@ mainExample learnerName teacherName autName = do
             NomLStarCol -> learnAngluin teacher
             NomNLStar   -> learnBollig 0 0 teacher
     print $ learned
-
-    print $ mealyBisim Examples.lru2 Examples.lruBad
-
-
-    print $ output Examples.lru2 [atom "a"]
-    print $ output Examples.lru2 [atom "a", atom "b"]
-    print $ output Examples.lru2 [atom "a", atom "b", atom "c"]
-    print $ output Examples.lru2 [atom "a", atom "b", atom "c", atom "d"]
 
     test [atom "a", atom "a"] target learned
     test [atom "a", atom "b"] target learned

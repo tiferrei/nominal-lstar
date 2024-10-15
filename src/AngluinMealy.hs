@@ -2,17 +2,17 @@
 {-# language PartialTypeSignatures #-}
 {-# language TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
-module Angluin where
+module AngluinMealy where
 
 import AbstractLStar
 import ObservationTableClass
-import qualified SimpleObservationTable as OT
+import qualified EnhancedObservationTable as OT
 import Teacher
 
 import Data.List (inits, tails)
 import Debug.Trace
 import NLambda hiding (alphabet)
-import Prelude (Bool (..), Maybe (..), error, show, ($), (++), (.), null)
+import Prelude (Bool (..), Maybe (..), error, show, ($), (++), (.), null, fst, snd)
 
 
 -- This returns all witnesses (of the form sa) for non-closedness
@@ -39,37 +39,36 @@ consistencyTestDirect t = case solve (isEmpty defect) of
 
 -- Given a C&C table, constructs an automaton. The states are given by 2^E (not
 -- necessarily equivariant functions)
-constructHypothesis :: (Nominal i, _) => table -> Automaton (Row table) i
-constructHypothesis t = simplify $ automaton q (alph t) d i f
+constructHypothesis :: (Nominal i, _) => table -> alpha -> Mealy (Row table) i o
+constructHypothesis t = simplify $ mealy q i (fst alpha) (snd alpha) d
     where
         q = map (row t) (rows t)
-        d = pairsWith (\s a -> (row t s, a, row t (s ++ [a]))) (rows t) (alph t)
-        i = singleton (rowEps t)
-        f = filter (`contains` []) q
+        i = rowEps t
+        d = sum $ pairsWith (\s a -> map (\b -> (row t s, a, b, row t (s++[a]))) (tableAt t s a)) (rows t) (alph t)
 
 -- Extends the table with all prefixes of a set of counter examples.
-useCounterExampleAngluin :: (Nominal i, _) => Teacher i -> [i] -> table -> table
+useCounterExampleAngluin :: (Nominal i, _) => MealyTeacher i o -> [i] -> table -> table
 useCounterExampleAngluin teacher ces t =
     let newRows = fromList $ inits ces
         newRowsRed = newRows \\ rows t
-     in addRows (membership teacher) newRowsRed t
+     in addRows (mealyMembership teacher) newRowsRed t
 
 -- This is the variant by Maler and Pnueli: Adds all suffixes as columns
-useCounterExampleMP :: (Nominal i, _) => Teacher i -> [i] -> table -> table
+useCounterExampleMP :: (Nominal i, _) => MealyTeacher i o -> [i] -> table -> table
 useCounterExampleMP teacher ces t =
     let newColumns = fromList $ tails ces
         newColumnsRed = newColumns \\ cols t
-     in addColumns (membership teacher) newColumnsRed t
+     in addColumns (mealyMembership teacher) newColumnsRed t
 
 -- Default: use counter examples in columns, which is slightly faster
-learnAngluin :: (Nominal i, _) => Teacher i -> Automaton _ i
-learnAngluin teacher = learnLoop useCounterExampleMP teacher (OT.initialBTable (membership teacher) (alphabet teacher))
+learnAngluin :: (Nominal i, _) => MealyTeacher i o -> Mealy _ i o
+learnAngluin teacher = learnLoop useCounterExampleMP teacher (OT.initialTableWith (mealyMembership teacher) (fst $ mealyAlphabet teacher) empty (fst $ mealyAlphabet teacher))
 
 -- The "classical" version, where counter examples are added as rows
-learnAngluinRows :: (Nominal i, _) => Teacher i -> Automaton _ i
-learnAngluinRows teacher = learnLoop useCounterExampleAngluin teacher (OT.initialBTable (membership teacher) (alphabet teacher))
+learnAngluinRows :: (Nominal i, _) => MealyTeacher i o -> Mealy _ i o
+learnAngluinRows teacher = learnLoop useCounterExampleAngluin teacher (OT.initialTableWith (mealyMembership teacher) (fst $ mealyAlphabet teacher) empty (fst $ mealyAlphabet teacher))
 
-learnLoop :: (Nominal i, ObservationTable table i Bool, _) => _ -> Teacher i -> table -> Automaton (Row table) i
+learnLoop :: (Nominal i, ObservationTable table i [o], _) => _ -> MealyTeacher i o -> table -> Mealy (Row table) i o
 learnLoop cexHandler teacher t =
     trace "1. Making it closed" $
     case closednessTest t of
@@ -89,7 +88,7 @@ learnLoop cexHandler teacher t =
                     trace "3. Equivalent? " $
                     eqloop t hyp
     where
-        hyp = constructHypothesis t
+        hyp = constructHypothesis t (mealyAlphabet teacher)
         eqloop s2 h = case equivalent teacher h of
                         Nothing -> trace "Yes" h
                         Just (consts, ces) -> trace "No" $

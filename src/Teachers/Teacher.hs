@@ -23,9 +23,16 @@ data Teacher i = Teacher
     , alphabet   :: Set i
     -- Keeps track of isolated constants
     , constants :: IORef [Atom]
-    }
+}
 
-cacheOracle :: (Show i, Nominal i) => ([i] -> Bool) -> [i] -> Bool
+data MealyTeacher i o = MealyTeacher {
+    mealyMembership :: [i] -> o,
+    mealyEquivalent :: forall q. (Show q, Nominal q) => Mealy q i o -> Maybe ([Atom], [i]),
+    mealyAlphabet   :: (Set i, Set o),
+    mealyConstants  :: IORef [Atom]
+}
+
+cacheOracle :: (Show i, Show o, Nominal i) => ([i] -> o) -> [i] -> o
 cacheOracle mem q = unsafePerformIO $ do
     cache <- readIORef cacheState
     out <- case find (\(i, _) -> i == q) cache of
@@ -47,7 +54,7 @@ cacheOracle mem q = unsafePerformIO $ do
         counter :: IORef Integer
         counter = unsafePerformIO $ newIORef 0
 
-eqGeneraliser :: (Show i, Nominal i, Contextual i) => IORef [Atom] -> ([i] -> Bool) -> (Automaton q i -> Maybe [i]) -> Automaton q i -> Maybe ([Atom], [i])
+eqGeneraliser :: (Show i, Nominal i, Contextual i, Show o, Eq o) => IORef [Atom] -> ([i] -> o) -> (m -> Maybe [i]) -> m -> Maybe ([Atom], [i])
 eqGeneraliser constsState mem equiv hyp = unsafePerformIO $ do
     let answer = equiv hyp
     let oracle = cacheOracle mem

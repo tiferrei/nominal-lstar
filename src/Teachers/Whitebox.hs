@@ -3,6 +3,7 @@ module Teachers.Whitebox where
 import NLambda
 
 import Prelude hiding (filter, map, not, sum)
+import Debug.Trace (trace, traceShow, traceShowId, traceWith)
 
 
 -- Checks bisimulation of initial states (only for DFAs)
@@ -28,6 +29,30 @@ bisim aut1 aut2 = go empty (pairsWith addEmptyWord (initialStates aut1) (initial
         d aut a x = mapFilter (\(s, l, t) -> maybeIf (s `eq` x /\ l `eq` a) t) (delta aut)
         stripWord (_, x, y) = (x, y)
         getRevWord (w, _, _) = reverse w
+        addEmptyWord x y = ([], x, y)
+
+-- Checks bisimulation of initial states for Mealy machines.
+-- returns some counterexamples if not bisimilar
+-- returns empty set iff bisimilar
+mealyBisim :: (Show i, Nominal i, Show o, Nominal o, Nominal q1, Nominal q2, Show q1, Show q2) => Mealy q1 i o -> Mealy q2 i o -> Set [i]
+mealyBisim aut1 aut2 = go empty (pairsWith addEmptyWord (singleton $ initialState aut1) (singleton $ initialState aut2))
+    where
+        go rel todo =
+            let -- if elements are already in R, we can skip them
+                todo2 = filter (\(_, x, y) -> (x, y) `notMember` rel) todo
+                -- split into correct pairs and wrong pairs
+                (cont, ces) = partition (\(w, _, _) -> output aut1 w `eq` output aut2 w) todo2
+                aa = NLambda.inputAlpha aut1
+                -- the good pairs should make one step
+                dtodo = sum (pairsWith (\(w, x, y) a -> pairsWith (\x2 y2 -> (w++[a], x2, y2)) (d aut1 a x) (d aut2 a y)) cont aa)
+            in  -- if there are wrong pairs
+                ite (isNotEmpty ces)
+                   -- then return counter examples
+                   (map (\(w, _, _) -> w) ces)
+                   -- else continue with good pairs
+                   (ite (isEmpty dtodo) empty (go (rel `union` map stripWord cont) dtodo))
+        d aut a x = mapFilter (\(s, l, _, t) -> maybeIf (s `eq` x /\ l `eq` a) t) (mealyDelta aut)
+        stripWord (_, x, y) = (x, y)
         addEmptyWord x y = ([], x, y)
 
 -- Attempt at using a bisimlution up to to proof bisimulation between NFAs.

@@ -12,9 +12,8 @@ module Examples.Adversarial where
 import           NLambda
 
 -- Explicit Prelude, as NLambda has quite some clashes
-import           Data.List    (reverse)
-import           Prelude     (Eq, Ord, Show, Read, ($), (.), (-))
-import qualified Prelude      ()
+import           Prelude     (Eq, Ord, Show, Read, Maybe)
+import           Data.List    ()
 
 import           GHC.Generics (Generic)
 
@@ -23,7 +22,6 @@ a = constant 1
 
 d :: Atom
 d = constant 4
-
 
 e :: Atom
 e = constant 5
@@ -48,6 +46,7 @@ mapNotSpecial func =
      Special _ -> nothing
      Common c -> just (func c))
 
+adversarial :: Automaton (Maybe (Adversarial Atom)) Atom
 adversarial = automatonWithTrashCan
     (singleton AdvInitial
         `union` mapNotSpecial AdvStore advAlpha
@@ -58,6 +57,7 @@ adversarial = automatonWithTrashCan
     (singleton AdvInitial)
     (singleton AdvAccept)
 
+extended :: Automaton (Maybe (Extended Atom)) Atom
 extended = automatonWithTrashCan
     (singleton ExtInitial
         `union` mapNotSpecial ExtStore advAlpha

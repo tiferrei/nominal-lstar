@@ -8,6 +8,7 @@ module Teacher
     , teacherWithIO
     , teacherWithIO2
     , teacherWithTargetAndIO
+    , mealyBisim
     ) where
 
 import Teachers.Teacher
@@ -32,19 +33,27 @@ import Prelude hiding (map)
 -- Only works for DFAs for now, as those can be checked for equivalence
 teacherWithTarget :: (Show i, Show q, Nominal i, Nominal q, Contextual i) => Automaton q i -> Teacher i
 teacherWithTarget aut = Teacher
-    { membership = cacheOracle (isTrue . accepts aut)
-    , equivalent = eqGeneraliser consts (isTrue . accepts aut) (automaticEquivalent bisim aut)
+    { membership = cacheOracle (boolAccepts aut)
+    , equivalent = eqGeneraliser consts (boolAccepts aut) (automaticEquivalent bisim aut)
     , alphabet   = NLambda.alphabet aut
     , constants  = consts
     }
+    where consts = unsafePerformIO $ newIORef []
+
+mealyTeacherWithTarget :: (Show i, Show o, Show q, Nominal i, Nominal o, Nominal q, Contextual i) => Mealy q i o -> MealyTeacher i o
+mealyTeacherWithTarget aut = MealyTeacher {
+    mealyMembership = cacheOracle (head . toList . output aut),
+    mealyEquivalent = eqGeneraliser consts (head . toList . output aut) (automaticEquivalent mealyBisim aut),
+    mealyAlphabet   = (inputAlpha aut, outputAlpha aut),
+    mealyConstants  = consts}
     where consts = unsafePerformIO $ newIORef []
 
 -- 1b. This is a fully automatic teacher, which has an internal automaton
 -- NFA have undecidable equivalence, n is a bound on deoth of bisimulation.
 teacherWithTargetNonDet :: (Show i, Show q, Nominal i, Nominal q, Contextual i) => Int -> Automaton q i -> Teacher i
 teacherWithTargetNonDet n aut = Teacher
-    { membership = cacheOracle (isTrue . accepts aut)
-    , equivalent = eqGeneraliser consts (isTrue . accepts aut) (automaticEquivalent (bisimNonDet n) aut)
+    { membership = cacheOracle (boolAccepts aut)
+    , equivalent = eqGeneraliser consts (boolAccepts aut) (automaticEquivalent (bisimNonDet n) aut)
     , alphabet   = NLambda.alphabet aut
     , constants  = consts
     }
@@ -80,8 +89,8 @@ teacherWithIO2 alph = Teacher
 -- used for NFAs when there was no bounded bisimulation yet
 teacherWithTargetAndIO :: (Show i, Show q, Read i, Nominal i, Contextual i, Nominal q) => Automaton q i -> Teacher i
 teacherWithTargetAndIO aut = Teacher
-    { membership = cacheOracle (isTrue . accepts aut)
-    , equivalent = eqGeneraliser consts (isTrue . accepts aut) ioEquivalent
+    { membership = cacheOracle (boolAccepts aut)
+    , equivalent = eqGeneraliser consts (boolAccepts aut) ioEquivalent
     , alphabet   = NLambda.alphabet aut
     , constants  = consts
     }

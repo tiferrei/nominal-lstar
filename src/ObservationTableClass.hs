@@ -5,7 +5,7 @@ module ObservationTableClass where
 
 import Data.Kind (Type)
 import NLambda (Nominal, Set, Atom, pairsWith)
-import Prelude ((++))
+import Prelude ((++), fst)
 
 -- Words are indices to our table
 type RowIndex i = [i]
