@@ -8,7 +8,9 @@ module Teacher
     , teacherWithIO
     , teacherWithIO2
     , teacherWithTargetAndIO
-    , mealyBisim
+    , mealyTeacherWithTarget
+    , automaticMembership
+    , automaticMembershipMealy
     ) where
 
 import Teachers.Teacher
@@ -21,6 +23,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import NLambda hiding (alphabet)
 import qualified NLambda (alphabet)
 import Prelude hiding (map)
+import Debug.Trace (traceShowId)
 
 -- We provide three ways to construct teachers:
 -- 1. Fully automatic
@@ -33,17 +36,17 @@ import Prelude hiding (map)
 -- Only works for DFAs for now, as those can be checked for equivalence
 teacherWithTarget :: (Show i, Show q, Nominal i, Nominal q, Contextual i) => Automaton q i -> Teacher i
 teacherWithTarget aut = Teacher
-    { membership = cacheOracle (boolAccepts aut)
-    , equivalent = eqGeneraliser consts (boolAccepts aut) (automaticEquivalent bisim aut)
+    { membership = cacheOracle (automaticMembership aut)
+    , equivalent = eqGeneraliser consts (automaticMembership aut) (automaticEquivalent bisim aut)
     , alphabet   = NLambda.alphabet aut
     , constants  = consts
     }
     where consts = unsafePerformIO $ newIORef []
 
-mealyTeacherWithTarget :: (Show i, Show o, Show q, Nominal i, Nominal o, Nominal q, Contextual i) => Mealy q i o -> MealyTeacher i o
+mealyTeacherWithTarget :: (Show i, Show o, Show q, Nominal i, Nominal o, Nominal q, Contextual i, Contextual o) => Mealy q i o -> MealyTeacher i o
 mealyTeacherWithTarget aut = MealyTeacher {
-    mealyMembership = cacheOracle (head . toList . output aut),
-    mealyEquivalent = eqGeneraliser consts (head . toList . output aut) (automaticEquivalent mealyBisim aut),
+    mealyMembership = cacheOracle (automaticMembershipMealy aut),
+    mealyEquivalent = eqGeneraliser consts (automaticMembershipMealy aut) (automaticEquivalent mealyBisim aut),
     mealyAlphabet   = (inputAlpha aut, outputAlpha aut),
     mealyConstants  = consts}
     where consts = unsafePerformIO $ newIORef []
@@ -52,8 +55,8 @@ mealyTeacherWithTarget aut = MealyTeacher {
 -- NFA have undecidable equivalence, n is a bound on deoth of bisimulation.
 teacherWithTargetNonDet :: (Show i, Show q, Nominal i, Nominal q, Contextual i) => Int -> Automaton q i -> Teacher i
 teacherWithTargetNonDet n aut = Teacher
-    { membership = cacheOracle (boolAccepts aut)
-    , equivalent = eqGeneraliser consts (boolAccepts aut) (automaticEquivalent (bisimNonDet n) aut)
+    { membership = cacheOracle (automaticMembership aut)
+    , equivalent = eqGeneraliser consts (automaticMembership aut) (automaticEquivalent (bisimNonDet n) aut)
     , alphabet   = NLambda.alphabet aut
     , constants  = consts
     }
@@ -89,14 +92,14 @@ teacherWithIO2 alph = Teacher
 -- used for NFAs when there was no bounded bisimulation yet
 teacherWithTargetAndIO :: (Show i, Show q, Read i, Nominal i, Contextual i, Nominal q) => Automaton q i -> Teacher i
 teacherWithTargetAndIO aut = Teacher
-    { membership = cacheOracle (boolAccepts aut)
-    , equivalent = eqGeneraliser consts (boolAccepts aut) ioEquivalent
+    { membership = cacheOracle (automaticMembership aut)
+    , equivalent = eqGeneraliser consts (automaticMembership aut) ioEquivalent
     , alphabet   = NLambda.alphabet aut
     , constants  = consts
     }
     where consts = unsafePerformIO $ newIORef []
 
-automaticEquivalent :: (Nominal a, Contextual a) => (p1 -> p2 -> Set a) -> p1 -> p2 -> Maybe a
+automaticEquivalent :: (Nominal a, Contextual a, Show a) => (p1 -> p2 -> Set a) -> p1 -> p2 -> Maybe a
 automaticEquivalent bisimlator aut hypo = case solve isEq of
         Nothing    -> error "should be solved"
         Just True  -> Nothing
@@ -104,3 +107,21 @@ automaticEquivalent bisimlator aut hypo = case solve isEq of
         where
             bisimRes = bisimlator aut hypo
             isEq = isEmpty bisimRes
+
+automaticMembership aut concQ = if Prelude.not (isTrue conc || isFalse conc)
+    then error "@@@ Error: accepts must be bolean on concrete input! @@@"
+    else isTrue conc
+    where
+        absQ = orbit [] concQ
+        absOut = map (\a -> (a, accepts aut a)) absQ
+        concOut = NLambda.filter (\(i, _) -> i `eq` concQ) absOut
+        conc = head . toList . mapFilter id . setOrbitsRepresentatives $ map snd concOut
+
+automaticMembershipMealy aut concQ = if Prelude.not (isTrue $ isSingleton conc)
+    then error "@@@ Error: output must be singleton symbol on concrete input! @@@"
+    else head . toList $ conc
+    where
+        absQ = orbit [] concQ
+        absOut = map (\a -> (a, output aut a)) absQ
+        concOut = traceShowId $ NLambda.filter (\(i, _) -> i `eq` concQ) absOut
+        conc = head . toList . mapFilter id . setOrbitsRepresentatives $ map snd concOut

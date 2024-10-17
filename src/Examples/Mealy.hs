@@ -4,59 +4,41 @@ module Examples.Mealy where
 import           NLambda
 
 -- Explicit Prelude, as NLambda has quite some clashes
-import           Prelude     (Eq, Ord, Show, Read)
+import           Prelude     (Eq, Ord, Show, Read, uncurry)
 
 import           GHC.Generics (Generic)
 
-data LRUState a = LRUInit | LRU1 a | LRU2 (a, a)
+data LRU a = LRUSInit | LRUS1 a | LRUS2 (a, a)
   deriving (Eq, Ord, Show, Read, Generic, Nominal, Contextual)
 
 data LRUOut = Hit | Miss
   deriving (Eq, Ord, Show, Read, Generic, Nominal, Contextual)
 
-lru1 :: Mealy (LRUState Atom) Atom LRUOut
+lru1 :: Mealy (LRU Atom) Atom LRUOut
 lru1 = mealy
-    (singleton LRUInit
-        `union` map LRU1 atoms)
-    LRUInit
+    (singleton LRUSInit
+        `union` map LRUS1 atoms)
+    LRUSInit
     atoms
     (fromList [Hit, Miss])
-    (map (\a -> (LRUInit, a, Miss, LRU1 a)) atoms
-        `union` map (\a -> (LRU1 a, a, Hit, LRU1 a)) atoms
-        `union` map (\(a, b) -> (LRU1 a, b, Miss, LRU1 b)) differentAtomsPairs)
+    (map (\a -> (LRUSInit, a, Miss, LRUS1 a)) atoms
+        `union` map (\a -> (LRUS1 a, a, Hit, LRUS1 a)) atoms
+        `union` map (\(a, b) -> (LRUS1 a, b, Miss, LRUS1 b)) differentAtomsPairs)
 
-lru2 :: Mealy (LRUState Atom) Atom LRUOut
+lru2 :: Mealy (LRU Atom) Atom LRUOut
 lru2 = mealy
-    (singleton LRUInit
-        `union` map LRU1 atoms
-        `union` map LRU2 atomsPairs)
-    LRUInit
+    (singleton LRUSInit
+        `union` map LRUS1 atoms
+        `union` map LRUS2 atomsPairs)
+    LRUSInit
     atoms
     (fromList [Hit, Miss])
-    (map (\a -> (LRUInit, a, Miss, LRU1 a)) atoms
-        `union` map (\a -> (LRU1 a, a, Hit, LRU1 a)) atoms
-        `union` map (\(a, b) -> (LRU1 a, b, Miss, LRU2 (a, b))) differentAtomsPairs
-        `union` map (\(a, b) -> (LRU2 (a, b), a, Hit, LRU2 (b, a))) atomsPairs
-        `union` map (\(a, b) -> (LRU2 (a, b), b, Hit, LRU2 (a, b))) atomsPairs
-        `union` map (\(a, b, c) -> (LRU2 (a, b), c, Miss, LRU2 (b, c))) freshQ)
+    (map (\a -> (LRUSInit, a, Miss, LRUS1 a)) atoms
+        `union` map (\a -> (LRUS1 a, a, Hit, LRUS1 a)) atoms
+        `union` map (\(a, b) -> (LRUS1 a, b, Miss, LRUS2 (a, b))) differentAtomsPairs
+        `union` map (\a -> (LRUS2 (a, a), a, Hit, LRUS2 (a, a))) atoms
+        `union` map (\(a, b) -> (LRUS2 (a, b), a, Hit, LRUS2 (b, a))) differentAtomsPairs
+        `union` map (\(a, b) -> (LRUS2 (a, b), b, Hit, LRUS2 (a, b))) differentAtomsPairs
+        `union` map (\(a, b, c) -> (LRUS2 (a, b), c, Miss, LRUS2 (b, c))) differentAtomsTriples)
     where
-        freshQ = triplesWithFilter (\a b c -> maybeIf (not (eq a c \/ eq a b)) (a, b, c)) atoms atoms atoms
-
-lruBad :: Mealy (LRUState Atom) Atom LRUOut
-lruBad = mealy
-    (singleton LRUInit
-        `union` map LRU1 atoms
-        `union` map LRU2 atomsPairs)
-    LRUInit
-    atoms
-    (fromList [Hit, Miss])
-    (map (\a -> (LRUInit, a, Miss, LRU1 a)) atoms
-        `union` map (\a -> (LRU1 a, a, Hit, LRU1 a)) atoms
-        `union` map (\(a, b) -> (LRU1 a, b, Miss, LRU2 (a, b))) differentAtomsPairs
-        `union` map (\(a, b) -> (LRU2 (a, b), a, Hit, LRU2 (a, b))) atomsPairs
-        `union` map (\(a, b) -> (LRU2 (a, b), b, Hit, LRU2 (a, b))) atomsPairs
-        `union` map (\(a, b, c) -> (LRU2 (a, b), c, Miss, LRU2 (b, c))) freshQ
-        )
-    where
-        freshQ = triplesWithFilter (\a b c -> maybeIf (not (eq a c \/ eq a b)) (a, b, c)) atoms atoms atoms
-
+        differentAtomsTriples = triplesWithFilter (\a b c -> maybeIf (not (eq a b \/ eq b c \/ eq a c)) (a, b, c)) atoms atoms atoms

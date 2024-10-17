@@ -6,18 +6,18 @@ module AngluinMealy where
 
 import AbstractLStar
 import ObservationTableClass
-import qualified EnhancedObservationTable as OT
+import qualified SimpleObservationTable as OT
 import Teacher
 
 import Data.List (inits, tails)
 import Debug.Trace
 import NLambda hiding (alphabet)
-import Prelude (Bool (..), Maybe (..), error, show, ($), (++), (.), null, fst, snd)
+import Prelude (Bool (..), Maybe (..), error, show, ($), (++), (.), null, fst, snd, init)
 
 
 -- This returns all witnesses (of the form sa) for non-closedness
 closednessTest :: (Nominal i, _) => table -> TestResult i
-closednessTest t = case solve (traceShowId $ isEmpty defect) of
+closednessTest t = case solve (isEmpty defect) of
     Just True  -> Succes
     Just False -> Failed defect empty
     Nothing    -> let err = error "@@@ Unsolvable (closednessTest) @@@" in Failed err err
@@ -39,48 +39,54 @@ consistencyTestDirect t = case solve (isEmpty defect) of
 
 -- Given a C&C table, constructs an automaton. The states are given by 2^E (not
 -- necessarily equivariant functions)
-constructHypothesis :: (Nominal i, _) => table -> alpha -> Mealy (Row table) i o
-constructHypothesis t = simplify $ mealy q i (fst alpha) (snd alpha) d
+constructHypothesis :: (Nominal i, _) => table -> _ -> Mealy (Row table) i o
+constructHypothesis t alpha = simplify $ mealy q i (fst alpha) (snd alpha) d
     where
         q = map (row t) (rows t)
         i = rowEps t
-        d = sum $ pairsWith (\s a -> map (\b -> (row t s, a, b, row t (s++[a]))) (tableAt t s a)) (rows t) (alph t)
+        d = sum $ pairsWith (\s a -> map (\b -> (row t s, a, b, row t (s++[a]))) (tableAt t s [a])) (rows t) (alph t)
 
 -- Extends the table with all prefixes of a set of counter examples.
 useCounterExampleAngluin :: (Nominal i, _) => MealyTeacher i o -> [i] -> table -> table
 useCounterExampleAngluin teacher ces t =
     let newRows = fromList $ inits ces
-        newRowsRed = newRows \\ rows t
+        newRowsRed = traceShowId $ newRows \\ rows t
      in addRows (mealyMembership teacher) newRowsRed t
 
 -- This is the variant by Maler and Pnueli: Adds all suffixes as columns
 useCounterExampleMP :: (Nominal i, _) => MealyTeacher i o -> [i] -> table -> table
 useCounterExampleMP teacher ces t =
-    let newColumns = fromList $ tails ces
+    let newColumns = fromList . init . tails $ ces
         newColumnsRed = newColumns \\ cols t
      in addColumns (mealyMembership teacher) newColumnsRed t
 
 -- Default: use counter examples in columns, which is slightly faster
 learnAngluin :: (Nominal i, _) => MealyTeacher i o -> Mealy _ i o
-learnAngluin teacher = learnLoop useCounterExampleMP teacher (OT.initialTableWith (mealyMembership teacher) (fst $ mealyAlphabet teacher) empty (fst $ mealyAlphabet teacher))
+learnAngluin teacher = learnLoop useCounterExampleMP teacher (OT.initialTableWith (mealyMembership teacher) alpha (singleton []) acols)
+    where
+        alpha = fst $ mealyAlphabet teacher
+        acols = map (: []) alpha
 
 -- The "classical" version, where counter examples are added as rows
 learnAngluinRows :: (Nominal i, _) => MealyTeacher i o -> Mealy _ i o
-learnAngluinRows teacher = learnLoop useCounterExampleAngluin teacher (OT.initialTableWith (mealyMembership teacher) (fst $ mealyAlphabet teacher) empty (fst $ mealyAlphabet teacher))
+learnAngluinRows teacher = learnLoop useCounterExampleAngluin teacher (OT.initialTableWith (mealyMembership teacher) alpha (singleton []) acols)
+    where
+        alpha = fst $ mealyAlphabet teacher
+        acols = map (: []) alpha
 
-learnLoop :: (Nominal i, ObservationTable table i [o], _) => _ -> MealyTeacher i o -> table -> Mealy (Row table) i o
+learnLoop :: (Nominal i, ObservationTable table i o, _) => _ -> MealyTeacher i o -> table -> Mealy (Row table) i o
 learnLoop cexHandler teacher t =
     trace "1. Making it closed" $
     case closednessTest t of
         Failed newRows _ ->
-            let state2 = addRows (membership teacher) newRows t in
+            let state2 = addRows (mealyMembership teacher) newRows t in
             trace ("newrows = " ++ show (simplify newRows)) $
             learnLoop cexHandler teacher state2
         Succes ->
             trace "2. Making it consistent" $
             case consistencyTestDirect t of
                 Failed _ newColumns ->
-                    let state2 = addColumns (membership teacher) newColumns t in
+                    let state2 = addColumns (mealyMembership teacher) newColumns t in
                     trace ("newcols = " ++ show (simplify newColumns)) $
                     learnLoop cexHandler teacher state2
                 Succes ->
@@ -89,10 +95,12 @@ learnLoop cexHandler teacher t =
                     eqloop t hyp
     where
         hyp = constructHypothesis t (mealyAlphabet teacher)
-        eqloop s2 h = case equivalent teacher h of
+        eqloop s2 h = case mealyEquivalent teacher h of
                         Nothing -> trace "Yes" h
                         Just (consts, ces) -> trace "No" $
                             let s3 = if null consts then s2 else addConstants consts s2 in
                             let s4 = cexHandler teacher ces s3 in
                             trace ("Using ce: " ++ show ces) $
+                            trace ("Correct output: " ++ show (mealyMembership teacher ces)) $
+                            trace ("Hyp output: " ++ show (output hyp ces)) $
                             learnLoop cexHandler teacher s4

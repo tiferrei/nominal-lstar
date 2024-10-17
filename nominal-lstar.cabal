@@ -19,7 +19,8 @@ library
   hs-source-dirs: src
   exposed-modules:
     AbstractLStar,
-    Angluin,
+    AngluinDFA,
+    AngluinMealy,
     Bollig,
     SimpleObservationTable,
     Examples,

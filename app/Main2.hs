@@ -1,4 +1,4 @@
-import Angluin
+import AngluinDFA
 import Bollig
 import Examples
 import Teacher

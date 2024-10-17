@@ -54,7 +54,7 @@ cacheOracle mem q = unsafePerformIO $ do
         counter :: IORef Integer
         counter = unsafePerformIO $ newIORef 0
 
-eqGeneraliser :: (Show i, Nominal i, Contextual i, Show o, Eq o) => IORef [Atom] -> ([i] -> o) -> (m -> Maybe [i]) -> m -> Maybe ([Atom], [i])
+eqGeneraliser :: (Show i, Nominal i, Contextual i, Show o, Nominal o) => IORef [Atom] -> ([i] -> o) -> (m -> Maybe [i]) -> m -> Maybe ([Atom], [i])
 eqGeneraliser constsState mem equiv hyp = unsafePerformIO $ do
     let answer = equiv hyp
     let oracle = cacheOracle mem

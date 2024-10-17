@@ -2,7 +2,7 @@
 {-# language PartialTypeSignatures #-}
 {-# language TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
-module Angluin where
+module AngluinDFA where
 
 import AbstractLStar
 import ObservationTableClass
@@ -17,7 +17,7 @@ import Prelude (Bool (..), Maybe (..), error, show, ($), (++), (.), null)
 
 -- This returns all witnesses (of the form sa) for non-closedness
 closednessTest :: (Nominal i, _) => table -> TestResult i
-closednessTest t = case solve (traceShowId $ isEmpty defect) of
+closednessTest t = case solve (isEmpty defect) of
     Just True  -> Succes
     Just False -> Failed defect empty
     Nothing    -> let err = error "@@@ Unsolvable (closednessTest) @@@" in Failed err err
