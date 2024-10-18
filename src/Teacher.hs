@@ -123,5 +123,5 @@ automaticMembershipMealy aut concQ = if Prelude.not (isTrue $ isSingleton conc)
     where
         absQ = orbit [] concQ
         absOut = map (\a -> (a, output aut a)) absQ
-        concOut = traceShowId $ NLambda.filter (\(i, _) -> i `eq` concQ) absOut
+        concOut = NLambda.filter (\(i, _) -> i `eq` concQ) absOut
         conc = head . toList . mapFilter id . setOrbitsRepresentatives $ map snd concOut

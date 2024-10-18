@@ -44,7 +44,7 @@ constructHypothesis t alpha = simplify $ mealy q i (fst alpha) (snd alpha) d
     where
         q = map (row t) (rows t)
         i = rowEps t
-        d = sum $ pairsWith (\s a -> map (\b -> (row t s, a, b, row t (s++[a]))) (tableAt t s [a])) (rows t) (alph t)
+        d = triplesWithFilter (\s a b -> maybeIf (tableAt t s [a] `contains` b) (row t s, a, b, row t (s++[a]))) (rows t) (fst alpha) (snd alpha)
 
 -- Extends the table with all prefixes of a set of counter examples.
 useCounterExampleAngluin :: (Nominal i, _) => MealyTeacher i o -> [i] -> table -> table
