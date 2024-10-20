@@ -5,7 +5,7 @@ module ObservationTableClass where
 
 import Data.Kind (Type)
 import NLambda (Nominal, Set, Atom, pairsWith)
-import Prelude ((++), fst)
+import Prelude ((++))
 
 -- Words are indices to our table
 type RowIndex i = [i]
@@ -37,7 +37,7 @@ class (Nominal table, Nominal i, Nominal o) => ObservationTable table i o | tabl
   -- updaters
   addRows :: MQ i o -> Set (RowIndex i) -> table -> table
   addColumns :: MQ i o -> Set (ColumnIndex i) -> table -> table
-  addConstants :: [Atom] -> table -> table
+  addConstants :: MQ i o -> [Atom] -> table -> table
 
   -- default implementations
   rowsExt t = pairsWith (\r a -> r ++ [a]) (rows t) (alph t)

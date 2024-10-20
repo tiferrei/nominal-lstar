@@ -16,9 +16,9 @@ import GHC.Generics (Generic)
 import NLambda
 import Prelude (Bool (..), Eq, Int, Ord, Show (..), fst, (++), ($), (.), head, id)
 import qualified Prelude ()
-import Debug.Trace (traceShowId)
+import Debug.Trace (traceShowId, traceShowWith)
 
-toPairs :: (Nominal i, Contextual i) => [Atom] -> Set i -> Set (Set i, i)
+toPairs :: (Nominal i, Contextual i, _) => [Atom] -> Set i -> Set (Set i, i)
 toPairs consts s = map (\o -> (o, reps o)) orbits
     where
         -- Note: setOrbits s == (map (orbit []) (mapFilter id . setOrbitsRepresentatives $ s))
@@ -26,18 +26,18 @@ toPairs consts s = map (\o -> (o, reps o)) orbits
         orbits = map (orbit consts) (mapFilter id . setOrbitsRepresentatives $ s)
         reps = head . toList . mapFilter id . setOrbitsRepresentatives
 
-ofPairs :: Nominal a => Set (Set a, a) -> Set a
+ofPairs :: (Nominal a, Nominal b) => Set (Set a, b) -> Set a
 ofPairs = sum . map fst
 
 -- We represent functions as their graphs
 -- Except when o = Bool, more on that later
 type Fun i o = Set (i, o)
 
-dom :: (Nominal a, Nominal b) => Set (Set (a, b), (a, b)) -> Set (Set a, a)
-dom = map (\(a, c) -> (map fst a, fst c))
+dom :: (Nominal i, Nominal o) => Fun i o -> Set i
+dom = map fst
 
 mqToPairs :: (Nominal i, Nominal o) => [Atom] -> ([i] -> o) -> Set (Set [i], [i]) -> Set (Set ([i], o), ([i], o))
-mqToPairs consts mq = map (\(_, c) -> (orbit consts (c, mq c), (c, mq c)))
+mqToPairs consts mq = map (\(_, c) -> let o = mq c in (orbit consts (c, o), (c, o)))
 
 -- A table is nothing more than a part of the language.
 -- Invariant: content is always defined for elements in
@@ -51,6 +51,14 @@ data Table i o = Table
     }
     deriving (Show, Ord, Eq, Generic, Nominal, Contextual)
 
+complete mq t@Table{..} =
+    t {
+        content = newContent
+    }
+    where
+        newPart = toPairs consts $ pairsWith (++) (ofPairs rowIndices `union` rowsExt t) (ofPairs colIndices)
+        newContent = mqToPairs consts mq newPart
+
 instance (Show i, Nominal i, Contextual i, Show o, Nominal o, Contextual o) => ObservationTable (Table i o) i o where
     type Row (Table i o) = Fun [i] o
     rows = ofPairs . rowIndices
@@ -61,34 +69,38 @@ instance (Show i, Nominal i, Contextual i, Show o, Nominal o, Contextual o) => O
 
     -- Assumption: newRows is disjoint from rows (for efficiency)
     addRows mq newRows t@Table{..} =
-        traceShowId t { content = content `union` newContent
-          , rowIndices = rowIndices `union` toPairs consts newRows
-          }
+        traceShowWith (\t' -> ("[DEBUG] After adding rows:\n", t')) $ t {
+            rowIndices = rowIndices `union` toPairs consts newRows,
+            content = content `union` newContent
+        }
         where
             newRowsExt = pairsWith (\r a -> r ++ [a]) newRows aa
-            newPart = toPairs consts $ pairsWith (++) (newRows `union` newRowsExt) (ofPairs colIndices)
-            newPartRed = newPart \\ dom content
+            newPart = pairsWith (++) (newRows `union` newRowsExt) (ofPairs colIndices)
+            newPartRed = toPairs consts $ newPart \\ dom (ofPairs content)
             newContent = mqToPairs consts mq newPartRed
 
     -- Assumption: newColumns is disjoint from columns (for efficiency)
     addColumns mq newColumns t@Table{..} =
-        traceShowId t { content = content `union` newContent
-          , colIndices = colIndices `union` toPairs consts newColumns
-          }
+        traceShowWith (\t' -> ("[DEBUG] After adding columns:\n", t')) $ t {
+            colIndices = colIndices `union` toPairs consts newColumns,
+            content = content `union` newContent
+        }
         where
             newColumnsExt = pairsWith (:) aa newColumns
-            newPart = toPairs consts $ pairsWith (++) (ofPairs rowIndices) (newColumns `union` newColumnsExt)
-            newPartRed = newPart \\ dom content
+            newPart = pairsWith (++) (ofPairs rowIndices) (newColumns `union` newColumnsExt)
+            newPartRed = toPairs consts $ newPart \\ dom (ofPairs content)
             newContent = mqToPairs consts mq newPartRed
 
-    addConstants addConsts t@Table{..} =
-        traceShowId t {
+    addConstants mq addConsts t@Table{..} =
+        traceShowWith (\t' -> ("[DEBUG] After adding constants:\n", t')) $ complete mq $ t {
             -- FIXME: Can probably be optimised.
-            content = toPairs newConsts (sum $ map fst content),
-            rowIndices = toPairs newConsts (sum $ map fst rowIndices),
-            colIndices = toPairs newConsts (sum $ map fst colIndices),
+            rowIndices = newRows,
+            colIndices = newCols `union` (traceShowId $ toPairs newConsts outCols),
             consts = newConsts }
         where
+            newRows = toPairs newConsts (ofPairs rowIndices)
+            newCols = toPairs newConsts (ofPairs colIndices)
+            outCols = traceShowId $ (map (:[]) aa) \\ (ofPairs newCols)
             newConsts = consts ++ addConsts
 
 -- We can reuse the above tables for the Boolean case and
@@ -111,7 +123,7 @@ instance (Nominal i, Show i, Contextual i) => ObservationTable (BTable i) i Bool
     tableAt = coerce (tableAt :: _ => Table i Bool -> _)
     addRows = coerce (addRows :: _ => _ -> _ -> Table i Bool -> Table i Bool)
     addColumns = coerce (addColumns :: _ => _ -> _ -> Table i Bool -> Table i Bool)
-    addConstants = coerce (addConstants :: _ => _ -> Table i Bool -> Table i Bool)
+    addConstants = coerce (addConstants :: _ => _ -> _ -> Table i Bool -> Table i Bool)
 
     -- These are specific to our representation of Row
     row (B Table{..}) r = let lang = mapFilter (\(i, o) -> maybeIf (fromBool o) i) (ofPairs content)
@@ -119,7 +131,7 @@ instance (Nominal i, Show i, Contextual i) => ObservationTable (BTable i) i Bool
     rowEps (B Table{..}) = mapFilter (\(i, o) -> maybeIf (fromBool o /\ i `member` ofPairs colIndices) i) (ofPairs content)
 
 
-initialTableWith :: (Nominal i, Contextual i, Nominal o, Contextual o) => MQ i o -> Set i -> Set (RowIndex i) -> Set (ColumnIndex i) -> Table i o
+initialTableWith :: (Nominal i, Nominal o, _) => MQ i o -> Set i -> Set (RowIndex i) -> Set (ColumnIndex i) -> Table i o
 initialTableWith mq alphabet newRows newColumns = Table
     { content = content
     , rowIndices = toPairs [] newRows
@@ -132,17 +144,17 @@ initialTableWith mq alphabet newRows newColumns = Table
         domain = toPairs [] $ pairsWith (++) newRows (newColumns `union` newColumnsExt)
         content = mqToPairs [] mq domain
 
-initialTable :: (Nominal i, Contextual i, Nominal o, Contextual o) => MQ i o -> Set i -> Table i o
+initialTable :: (Nominal i, Nominal o, _) => MQ i o -> Set i -> Table i o
 initialTable mq alphabet = initialTableWith mq alphabet (singleton []) (singleton [])
 
-initialTableSize :: (Nominal i, Contextual i, Nominal o, Contextual o) => MQ i o -> Set i -> Int -> Int -> Table i o
+initialTableSize :: (Nominal i, Nominal o, _) => MQ i o -> Set i -> Int -> Int -> Table i o
 initialTableSize mq alphabet rs cs = initialTableWith mq alphabet (replicateSetUntil rs alphabet) (replicateSetUntil cs alphabet)
 
-initialBTableWith :: (Nominal i, Contextual i) => MQ i Bool -> Set i -> Set (RowIndex i) -> Set (ColumnIndex i) -> BTable i
+initialBTableWith :: (Nominal i, _) => MQ i Bool -> Set i -> Set (RowIndex i) -> Set (ColumnIndex i) -> BTable i
 initialBTableWith = coerce initialTableWith
 
-initialBTable :: (Nominal i, Contextual i) => MQ i Bool -> Set i -> BTable i
+initialBTable :: (Nominal i, _) => MQ i Bool -> Set i -> BTable i
 initialBTable = coerce initialTable
 
-initialBTableSize :: (Nominal i, Contextual i) => MQ i Bool -> Set i -> Int -> Int -> BTable i
+initialBTableSize :: (Nominal i, _) => MQ i Bool -> Set i -> Int -> Int -> BTable i
 initialBTableSize = coerce initialTableSize

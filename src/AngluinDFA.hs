@@ -93,7 +93,7 @@ learnLoop cexHandler teacher t =
         eqloop s2 h = case equivalent teacher h of
                         Nothing -> trace "Yes" h
                         Just (consts, ces) -> trace "No" $
-                            let s3 = if null consts then s2 else addConstants consts s2 in
+                            let s3 = if null consts then s2 else addConstants (membership teacher) consts s2 in
                             let s4 = cexHandler teacher ces s3 in
                             trace ("Using ce: " ++ show ces) $
                             learnLoop cexHandler teacher s4

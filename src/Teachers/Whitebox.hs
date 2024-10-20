@@ -3,8 +3,6 @@ module Teachers.Whitebox where
 import NLambda
 
 import Prelude hiding (filter, map, not, sum)
-import Debug.Trace (trace, traceShow, traceShowId, traceWith)
-
 
 -- Checks bisimulation of initial states (only for DFAs)
 -- returns some counterexamples if not bisimilar
@@ -29,33 +27,6 @@ bisim aut1 aut2 = go empty (pairsWith addEmptyWord (initialStates aut1) (initial
         d aut a x = mapFilter (\(s, l, t) -> maybeIf (s `eq` x /\ l `eq` a) t) (delta aut)
         stripWord (_, x, y) = (x, y)
         getRevWord (w, _, _) = reverse w
-        addEmptyWord x y = ([], x, y)
-
--- Checks bisimulation of initial states for Mealy machines.
--- returns some counterexamples if not bisimilar
--- returns empty set iff bisimilar
-mealyBisim :: (Show i, Nominal i, Show o, Nominal o, Nominal q1, Nominal q2, Show q1, Show q2) => Mealy q1 i o -> Mealy q2 i o -> Set [i]
-mealyBisim aut1 aut2 = go empty (pairsWith addEmptyWord (singleton $ initialState aut1) (singleton $ initialState aut2))
-    where
-        go rel todo =
-            let -- if elements are already in R, we can skip them
-                todo2 = filter (\(_, x, y) -> (x, y) `notMember` rel) todo
-                -- split into correct pairs and wrong pairs
-                aa = NLambda.inputAlpha aut1
-                (cont, ces) = partition (\(w, _, _) -> forAll (\a -> output aut1 (w++[a]) `eq` output aut2 (w++[a])) aa) todo2
-                -- the good pairs should make one step
-                dtodo = sum (pairsWith (\(w, x, y) a -> pairsWith (\x2 y2 -> (w++[a], x2, y2)) (d aut1 x a) (d aut2 y a)) cont aa)
-            in  -- if there are wrong pairs
-                ite (isNotEmpty ces)
-                   -- then return counter examples
-                   (snd $ partition (\w -> output aut1 w `eq` output aut2 w) $ pairsWith (\(w, _, _) a -> w++[a]) ces aa)
-                   -- else continue with good pairs
-                   (ite (isEmpty dtodo) empty (go (rel `union` map stripWord cont) dtodo))
-        d aut x a = map (\(_, _, _, s) -> s) $ intersection matched_state matched_letter
-            where
-                matched_state = fst $ partition (\(s1, _, _, _) -> s1 `eq` x) (mealyDelta aut)
-                matched_letter = fst $ partition (\(_, li, _, _) -> li `eq` a) (mealyDelta aut)
-        stripWord (_, x, y) = (x, y)
         addEmptyWord x y = ([], x, y)
 
 -- Attempt at using a bisimlution up to to proof bisimulation between NFAs.
@@ -98,3 +69,31 @@ bisimNonDet n aut1 aut2 = go empty (singleton ([], initialStates aut1, initialSt
         stripWord (_, x, y) = (x, y)
         getRevWord (w, _, _) = reverse w
         sumMap f = sum . map f
+
+-- Checks bisimulation of initial states for Mealy machines.
+-- returns some counterexamples if not bisimilar
+-- returns empty set iff bisimilar
+mealyBisim :: (Show i, Nominal i, Show o, Nominal o, Nominal q1, Nominal q2, Show q1, Show q2) => Mealy q1 i o -> Mealy q2 i o -> Set [i]
+mealyBisim aut1 aut2 = go empty (pairsWith addEmptyWord (singleton $ initialState aut1) (singleton $ initialState aut2))
+    where
+        go rel todo =
+            let -- if elements are already in R, we can skip them
+                todo2 = filter (\(_, x, y) -> (x, y) `notMember` rel) todo
+                -- split into correct pairs and wrong pairs
+                aa = NLambda.inputAlpha aut1
+                (cont, ces) = partition (\(w, _, _) -> forAll (\a -> output aut1 (w++[a]) `eq` output aut2 (w++[a])) aa) todo2
+                -- the good pairs should make one step
+                dtodo = sum (pairsWith (\(w, x, y) a -> pairsWith (\x2 y2 -> (w++[a], x2, y2)) (d aut1 x a) (d aut2 y a)) cont aa)
+            in  -- if there are wrong pairs
+                ite (isNotEmpty ces)
+                   -- then return counter examples
+                   (snd $ partition (\w -> output aut1 w `eq` output aut2 w) $ pairsWith (\(w, _, _) a -> w++[a]) ces aa)
+                   -- else continue with good pairs
+                   (ite (isEmpty dtodo) empty (go (rel `union` map stripWord cont) dtodo))
+        d aut x a = map (\(_, _, _, s) -> s) $ intersection matched_state matched_letter
+            where
+                matched_state = fst $ partition (\(s1, _, _, _) -> s1 `eq` x) (mealyDelta aut)
+                matched_letter = fst $ partition (\(_, li, _, _) -> li `eq` a) (mealyDelta aut)
+        stripWord (_, x, y) = (x, y)
+        addEmptyWord x y = ([], x, y)
+

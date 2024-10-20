@@ -50,7 +50,7 @@ constructHypothesis t alpha = simplify $ mealy q i (fst alpha) (snd alpha) d
 useCounterExampleAngluin :: (Nominal i, _) => MealyTeacher i o -> [i] -> table -> table
 useCounterExampleAngluin teacher ces t =
     let newRows = fromList $ inits ces
-        newRowsRed = traceShowId $ newRows \\ rows t
+        newRowsRed = newRows \\ rows t
      in addRows (mealyMembership teacher) newRowsRed t
 
 -- This is the variant by Maler and Pnueli: Adds all suffixes as columns
@@ -98,9 +98,11 @@ learnLoop cexHandler teacher t =
         eqloop s2 h = case mealyEquivalent teacher h of
                         Nothing -> trace "Yes" h
                         Just (consts, ces) -> trace "No" $
-                            let s3 = if null consts then s2 else addConstants consts s2 in
+                            let s3 = if null consts then s2 else addConstants (mealyMembership teacher) consts s2 in
                             let s4 = cexHandler teacher ces s3 in
                             trace ("Using ce: " ++ show ces) $
                             trace ("Correct output: " ++ show (mealyMembership teacher ces)) $
                             trace ("Hyp output: " ++ show (output hyp ces)) $
-                            learnLoop cexHandler teacher s4
+                            if isTrue $ isEmpty (output hyp ces)
+                                then error "bad hyp!"
+                                else learnLoop cexHandler teacher s4

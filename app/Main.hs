@@ -24,7 +24,7 @@ data Teacher
   | EqMealy
   deriving (Show, Read)
 
-data Aut = Running Int | Adversarial | Extended | NFA1 | Bollig Int | NonResidual | LRU1 | LRU2
+data Aut = Running Int | Adversarial | Extended | NFA1 | Bollig Int | NonResidual | LRU1 | LRU2 | LRU1Faulty | LRU2Faulty
   deriving (Show, Read)
 
 -- existential wrapper
@@ -34,14 +34,16 @@ data M = forall q o . (Nominal q, Show q, Show o, Nominal o, Contextual o) => M 
 testDFA :: _ => [i] -> _ -> _ -> IO ()
 testDFA str target learned =
     putStrLn $ "Test: " ++ show str ++ " -> " ++ show (t, m)
-    where t = automaticMembership target str
-          m = automaticMembership learned str
+    where
+        t = automaticMembership target str
+        m = automaticMembership learned str
 
 testMealy :: _ => [i] -> _ -> _ -> IO ()
 testMealy str target learned =
     putStrLn $ "Test: " ++ show str ++ " -> " ++ show (t, m)
-    where t = automaticMembershipMealy target str
-          m = automaticMembershipMealy learned str
+    where
+        t = automaticMembershipMealy target str
+        m = automaticMembershipMealy learned str
 
 mainDFAWithIO :: String -> IO ()
 mainDFAWithIO learnerName = do
@@ -50,7 +52,6 @@ mainDFAWithIO learnerName = do
             NomLStar    -> AngluinDFA.learnAngluinRows t
             NomLStarCol -> AngluinDFA.learnAngluin t
             NomNLStar   -> learnBollig 0 0 t
-            _           -> error "Unsupported learner!"
     print target
 
 {- HLINT ignore "Redundant $" -}
@@ -75,7 +76,6 @@ mainDFA learnerName teacherName autName = do
             NomLStar    -> AngluinDFA.learnAngluinRows teacher
             NomLStarCol -> AngluinDFA.learnAngluin teacher
             NomNLStar   -> learnBollig 0 0 teacher
-            _           -> error "Unsupported learner!"
     print $ learned
 
     testDFA [a,a] target learned
@@ -90,17 +90,20 @@ mainDFA learnerName teacherName autName = do
 {- HLINT ignore "Redundant $" -}
 mainMealy :: String -> String -> String -> IO ()
 mainMealy learnerName teacherName autName = do
+    --showSmtInfo
     M target <- return $ case read autName of
             LRU1  -> M $ Examples.lru1
             LRU2  -> M $ Examples.lru2
+            LRU1Faulty -> M $ Examples.lru1Faulty (constant 4)
+            LRU2Faulty -> M $ Examples.lru2Faulty (constant 4)
             _     -> error "Unsupported target!"
     putStrLn $ "Target to be learned:\n" ++ show target
     let teacher = case read teacherName of
             EqMealy -> mealyTeacherWithTarget target
             _       -> error "Unsupported teacher!"
     let learned = case read learnerName of
-            NomLStar    -> AngluinMealy.learnAngluinRows teacher
             NomLStarCol -> AngluinMealy.learnAngluin teacher
+            NomLStar -> AngluinMealy.learnAngluinRows teacher
             _           -> error "Unsupported learner!"
     print $ learned
 
@@ -114,6 +117,18 @@ mainMealy learnerName teacherName autName = do
     testMealy [constant 1, constant 0, constant 0] target learned
     testMealy [constant 1, constant 0, constant 1] target learned
     testMealy [constant 1, constant 1, constant 0] target learned
+    testMealy [constant 1, constant 1, constant 1] target learned
+
+    testMealy [constant 4] target learned
+    testMealy [constant 4, constant 4] target learned
+    testMealy [constant 4, constant 1] target learned
+    testMealy [constant 4, constant 4, constant 4] target learned
+    testMealy [constant 4, constant 4, constant 1] target learned
+    testMealy [constant 4, constant 1, constant 4] target learned
+    testMealy [constant 4, constant 1, constant 1] target learned
+    testMealy [constant 1, constant 4, constant 4] target learned
+    testMealy [constant 1, constant 4, constant 1] target learned
+    testMealy [constant 1, constant 1, constant 4] target learned
     testMealy [constant 1, constant 1, constant 1] target learned
 
 main :: IO ()
