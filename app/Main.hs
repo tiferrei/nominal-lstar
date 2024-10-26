@@ -24,7 +24,7 @@ data Teacher
   | EqMealy
   deriving (Show, Read)
 
-data Aut = Running Int | Adversarial | Extended | NFA1 | Bollig Int | NonResidual | LRU1 | LRU2 | LRU1Faulty | LRU2Faulty
+data Aut = Running Int | Adversarial | Extended | NFA1 | Bollig Int | NonResidual | LRU1 | LRU2 | LRU3 | LRU1Faulty | LRU2Faulty
   deriving (Show, Read)
 
 -- existential wrapper
@@ -94,6 +94,7 @@ mainMealy learnerName teacherName autName = do
     M target <- return $ case read autName of
             LRU1  -> M $ Examples.lru1
             LRU2  -> M $ Examples.lru2
+            LRU3  -> M $ Examples.lru3
             LRU1Faulty -> M $ Examples.lru1Faulty (constant 4)
             LRU2Faulty -> M $ Examples.lru2Faulty (constant 4)
             _     -> error "Unsupported target!"

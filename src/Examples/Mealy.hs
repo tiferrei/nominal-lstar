@@ -4,11 +4,11 @@ module Examples.Mealy where
 import           NLambda
 
 -- Explicit Prelude, as NLambda has quite some clashes
-import           Prelude     (Eq, Ord, Show, Read, uncurry)
+import           Prelude     (Eq, Ord, Show, Read, ($))
 
 import           GHC.Generics (Generic)
 
-data LRU a = LRUSInit | LRUS1 a | LRUS2 (a, a)
+data LRU a = LRUSInit | LRUS1 a | LRUS2 (a, a) | LRUS3 (a, a, a) | LRUS4 (a, a, a, a)
   deriving (Eq, Ord, Show, Read, Generic, Nominal, Contextual)
 
 data LRUOut = Hit | Miss
@@ -82,3 +82,29 @@ lru2Faulty special = mealy
         ss = singleton LRUSInit
             `union` map LRUS1 commons
             `union` map LRUS2 commonsPairs
+
+lru3 :: Mealy (LRU Atom) Atom LRUOut
+lru3 = mealy
+    (singleton LRUSInit
+        `union` map LRUS1 atoms
+        `union` map LRUS2 atomsPairs
+        `union` map LRUS3 atomsTriples
+    )
+    LRUSInit
+    atoms
+    (fromList [Hit, Miss])
+    (map (\a -> (LRUSInit, a, Miss, LRUS1 a)) atoms
+        `union` map (\a -> (LRUS1 a, a, Hit, LRUS1 a)) atoms
+        `union` map (\(a, b) -> (LRUS1 a, b, Miss, LRUS2 (a, b))) differentAtomsPairs
+        `union` map (\(a, b) -> (LRUS2 (a, b), a, Hit, LRUS2 (b, a))) differentAtomsPairs
+        `union` map (\(a, b) -> (LRUS2 (a, b), b, Hit, LRUS2 (a, b))) differentAtomsPairs
+        `union` map (\(a, b, c) -> (LRUS2 (a, b), c, Miss, LRUS3 (a, b, c))) differentAtomsTriples
+        `union` map (\(a, b, c) -> (LRUS3 (a, b, c), a, Hit, LRUS3 (b, c, a))) differentAtomsTriples
+        `union` map (\(a, b, c) -> (LRUS3 (a, b, c), b, Hit, LRUS3 (a, c, b))) differentAtomsTriples
+        `union` map (\(a, b, c) -> (LRUS3 (a, b, c), c, Hit, LRUS3 (a, b, c))) differentAtomsTriples
+        `union` map (\(a, b, c, d) -> (LRUS3 (a, b, c), d, Miss, LRUS3 (b, c, d))) differentAtomsQuadruples)
+    where
+        differentAtomsTriples = triplesWithFilter (\a b c -> maybeIf (not (eq a b \/ eq b c \/ eq a c)) (a, b, c)) atoms atoms atoms
+        atomsQuadruples = pairsWith (\a (b, c, d) -> (a, b, c, d)) atoms atomsTriples
+        differentAtomsQuadruples = mapFilter (\(a, b, c, d) -> maybeIf (not (eq a b \/ eq b c \/ eq a c \/ eq a d \/ eq b d \/ eq c d)) (a, b, c, d)) atomsQuadruples
+
